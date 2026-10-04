@@ -1,12 +1,22 @@
 import type { Order } from "@/types";
-import type { InvoiceData } from "@/components/booking/order-invoice-modal";
+import type { UnifiedInvoiceInput } from "./invoice-html-template";
 import { formatSlotLabel, resolveDetergentName } from "@/lib/utils";
 
-export function orderToInvoiceData(
+export interface InvoiceMapperOptions {
+  slotTimes?: { s1?: string; e1?: string; s2?: string; e2?: string };
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  transactionId?: string;
+  address?: string;
+}
+
+export function orderToUnifiedInvoice(
   order: Order,
-  slotTimes?: { s1?: string; e1?: string; s2?: string; e2?: string }
-): InvoiceData {
+  options?: InvoiceMapperOptions
+): UnifiedInvoiceInput {
   const fullAddress =
+    options?.address ||
     [
       order.street_address,
       order.apt_unit ? `Apt ${order.apt_unit}` : "",
@@ -19,6 +29,7 @@ export function orderToInvoiceData(
     order.pickup_address ||
     "Doorstep Address";
 
+  const slotTimes = options?.slotTimes;
   const slotLabel =
     slotTimes?.s1 &&
     slotTimes?.e1 &&
@@ -67,8 +78,23 @@ export function orderToInvoiceData(
           ? "Google Pay (Stripe)"
           : order.payment_method || "Stripe 256-Bit Secure Checkout";
 
+  const detergentName = order.detergent_name || resolveDetergentName(order.detergent_id);
+  const doorstepProtocol = order.is_out_of_home
+    ? "Away — Contactless Doorstep"
+    : "Home — Driver Rings Bell";
+  const specialRequest = order.customer_notes
+    ? `${doorstepProtocol} (${order.customer_notes})`
+    : doorstepProtocol;
+
+  const orderId = order.order_number || "LX-ORDER";
+  const transactionId =
+    options?.transactionId ||
+    order.stripe_payment_intent ||
+    `STRIPE-TX-${orderId.replace(/[^A-Za-z0-9]/g, "").slice(-8).toUpperCase()}`;
+
   return {
-    orderId: order.order_number,
+    orderId,
+    orderNumber: orderId,
     orderDate,
     pickupDate: order.pickup_date,
     pickupSlot: slotLabel,
@@ -79,18 +105,24 @@ export function orderToInvoiceData(
     detergentFee: Number(order.detergent_fee || 0),
     deliveryFee: Number(order.delivery_fee || 0),
     discountAmount: Number(order.discount_amount || 0),
-    transactionId: order.stripe_payment_intent || undefined,
-    customerName: order.customer_name || "Valued Customer",
-    customerEmail: order.customer_email || "",
-    customerPhone: order.customer_phone || "",
+    transactionId,
+    customerName: options?.customerName || order.customer_name || "Valued Customer",
+    customerEmail: options?.customerEmail || order.customer_email || "",
+    customerPhone: options?.customerPhone || order.customer_phone || undefined,
     address: fullAddress,
+    planName: planLabel,
+    quantity: quantityLabel,
+    detergent: detergentName,
+    specialRequest,
     orderDetails: {
       planName: planLabel,
       quantity: quantityLabel,
-      detergent: order.detergent_name || resolveDetergentName(order.detergent_id),
-      specialRequest: order.is_out_of_home
-        ? "Away — Contactless Doorstep Pickup"
-        : "Home — Driver Rings Bell",
+      detergent: detergentName,
+      specialRequest,
     },
+    orderCancelled: order.order_status === "cancelled",
   };
 }
+
+/** Legacy alias for backwards compatibility */
+export const orderToInvoiceData = orderToUnifiedInvoice;

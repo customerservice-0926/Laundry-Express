@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import nodemailer from "nodemailer";
 import { createEmailInvoicePdf } from "@/lib/invoice/email-invoice-pdf";
 import { generateInvoiceHtml } from "@/lib/invoice/invoice-html-template";
@@ -96,9 +98,19 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
     content: invoicePdf,
     contentType: "application/pdf",
   };
+  const logoPath = path.join(process.cwd(), "public", "brand", "logo-badge.jpg");
+  const logoAttachment = fs.existsSync(logoPath)
+    ? {
+        filename: "logo-badge.jpg",
+        path: logoPath,
+        cid: "brand-logo-badge",
+      }
+    : null;
+  const attachments = [attachment, ...(logoAttachment ? [logoAttachment] : [])];
+
   const [userResult, adminResult] = await Promise.allSettled([
-    transport.sendMail({ from, to: payload.customerEmail, subject: `${payload.orderCancelled ? "Payment Received — Order Cancelled (No Refund Issued)" : "Order Confirmed"} — ${payload.orderNumber.replace(/[\r\n]/g, " ")} | Laundry Express`, html, attachments: [attachment] }),
-    transport.sendMail({ from, to: admin, subject: `${payload.orderCancelled ? "Payment for Cancelled Order (No Refund Issued)" : "New Order"} — ${payload.orderNumber.replace(/[\r\n]/g, " ")} | ${payload.customerName.replace(/[\r\n]/g, " ")}`, html, attachments: [attachment] }),
+    transport.sendMail({ from, to: payload.customerEmail, subject: `${payload.orderCancelled ? "Payment Received — Order Cancelled (No Refund Issued)" : "Order Confirmed"} — ${payload.orderNumber.replace(/[\r\n]/g, " ")} | Laundry Express`, html, attachments }),
+    transport.sendMail({ from, to: admin, subject: `${payload.orderCancelled ? "Payment for Cancelled Order (No Refund Issued)" : "New Order"} — ${payload.orderNumber.replace(/[\r\n]/g, " ")} | ${payload.customerName.replace(/[\r\n]/g, " ")}`, html, attachments }),
   ]);
 
   const errors: string[] = [];

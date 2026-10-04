@@ -85,7 +85,7 @@ export function useBookingCheckout() {
         return;
       }
 
-      window.location.assign(`/dashboard/orders?order_id=${encodeURIComponent(data.order.order_number)}`);
+      window.location.assign(`/order/success?order_id=${encodeURIComponent(data.order.order_number)}`);
     } catch (error) {
       setCheckoutError(error instanceof Error ? error.message : "Unable to place your order. Please try again.");
     } finally {

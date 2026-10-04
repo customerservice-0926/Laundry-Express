@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     try {
       session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"], line_items: lineItems, mode: "payment", customer_email: user.email,
-        success_url: `${origin}/dashboard/orders?checkout=complete&order_id=${encodeURIComponent(createdOrder.order_number)}`,
+        success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}&order_id=${encodeURIComponent(createdOrder.order_number)}`,
         cancel_url: `${origin}/order?canceled=true&order_id=${createdOrder.order_number}`,
         metadata: { order_id: createdOrder.id, order_number: createdOrder.order_number, user_id: createdOrder.user_id || "", pickup_date: createdOrder.pickup_date || "", pickup_slot: createdOrder.pickup_slot || "" },
         payment_intent_data: { metadata: { order_number: createdOrder.order_number, order_id: createdOrder.id } },

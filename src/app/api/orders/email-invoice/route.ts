@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { OrderService } from "@/lib/services/order-service";
 import { ContentService } from "@/lib/services/content-service";
-import { sendInvoiceEmail } from "@/lib/services/email-service";
-import { formatSlotLabel, resolveDetergentName } from "@/lib/utils";
+import { sendInvoiceEmail, type InvoiceEmailPayload } from "@/lib/services/email-service";
+import { orderToUnifiedInvoice } from "@/lib/invoice/invoice-utils";
 import { getVerifiedUser } from "@/lib/auth-request";
 
 /**
@@ -47,52 +47,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: "Invoice was already sent.", orderNumber: order.order_number });
     }
 
-    const slotLabel = settings?.slot1_start && settings.slot1_end && settings.slot2_start && settings.slot2_end &&
-      (order.pickup_slot === "8am-12pm" || order.pickup_slot === "1pm-6pm")
-      ? formatSlotLabel(
-          order.pickup_slot as "8am-12pm" | "1pm-6pm",
-          settings.slot1_start || "", settings.slot1_end || "",
-          settings.slot2_start || "", settings.slot2_end || ""
-        )
-      : order.pickup_slot || "Scheduled Window";
-
-    const planNames: Record<string, string> = {
-      per_bag: "By The Bag (13 Gal)",
-      per_lb: "By The Pound (lb)",
-      package: "Saver Package",
-    };
-
-    const fullAddress = [
-      order.street_address,
-      order.apt_unit ? `Apt ${order.apt_unit}` : "",
-      order.city, order.state, order.zip_code,
-    ].filter(Boolean).join(", ") || order.pickup_address || "";
-
-    await sendInvoiceEmail({
-      orderNumber: order.order_number,
-      orderDate: order.created_at,
-      paymentMethod: order.payment_method || "Credit / Debit Card (Stripe)",
-      customerName: order.customer_name || "Valued Customer",
-      customerEmail: order.customer_email || "",
-      pickupDate: order.pickup_date,
-      pickupSlot: slotLabel,
-      deliveryDate: order.delivery_date || "Within 24 Hours",
-      planName: planNames[order.pricing_mode] || order.pricing_mode,
-      quantity: order.pricing_mode === "per_bag"
-        ? `${order.bag_count} Bag(s)`
-        : `${order.final_weight_lbs || order.estimated_weight_lbs || 0} lbs`,
-      detergent: order.detergent_name || resolveDetergentName(order.detergent_id),
-      detergentFee: Number(order.detergent_fee || 0),
-      subtotal: Number(order.subtotal || 0),
-      deliveryFee: Number(order.delivery_fee || 0),
-      discountAmount: Number(order.discount_amount || 0),
-      totalAmount: Number(order.total_amount || 0),
-      address: fullAddress,
-      customerPhone: order.customer_phone || undefined,
-      specialRequest: order.customer_notes || undefined,
-      transactionId: order.stripe_payment_intent || undefined,
-      orderCancelled: order.order_status === "cancelled",
+    const invoicePayload = orderToUnifiedInvoice(order, {
+      slotTimes: settings
+        ? { s1: settings.slot1_start, e1: settings.slot1_end, s2: settings.slot2_start, e2: settings.slot2_end }
+        : undefined,
     });
+
+    await sendInvoiceEmail(invoicePayload as unknown as InvoiceEmailPayload);
     await OrderService.markInvoiceEmailSent(order.id);
 
     return NextResponse.json({

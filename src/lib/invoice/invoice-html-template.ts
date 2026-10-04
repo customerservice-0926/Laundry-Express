@@ -75,7 +75,7 @@ export function generateInvoiceHtml(inv: UnifiedInvoiceInput): string {
   const statusText = inv.orderCancelled ? "PAID — ORDER CANCELLED" : "PAID &amp; CONFIRMED";
 
   const isBrowser = typeof window !== "undefined";
-  const logoUrl = isBrowser ? "/brand/logo-badge.jpg" : `${APP_CONFIG.url.replace(/\/$/, "")}/brand/logo-badge.jpg`;
+  const logoUrl = isBrowser ? "/brand/logo-badge.jpg" : "cid:brand-logo-badge";
 
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:620px;width:100%;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
