@@ -183,6 +183,46 @@
   .bubble-container>div:nth-child(n+6) { display: none; }
 }
 
+/* Site-wide Static-Safe Animations & Micro-Interactions */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(236, 72, 153, 0.25); }
+  50% { box-shadow: 0 0 28px rgba(236, 72, 153, 0.5); }
+}
+
+@keyframes floatMascot {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-slide-up { animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-float { animation: floatMascot 4s ease-in-out infinite; }
+.animate-glow-pulse { animation: pulseGlow 3s ease-in-out infinite; }
+
+.hover-lift {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px -6px rgba(236, 72, 153, 0.18), 0 6px 14px -4px rgba(20, 27, 46, 0.08);
+}
+
+.card-interactive { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: rgba(236, 72, 153, 0.45);
+}
+
 /* Professional Print Stylesheet for Tax Invoice */
 @media print {
   body { background: #ffffff !important; color: #0f172a !important; }

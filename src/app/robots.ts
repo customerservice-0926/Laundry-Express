@@ -2,17 +2,21 @@ import type { MetadataRoute } from "next";
 import { APP_CONFIG } from "@/lib/constants";
 
 export default function robots(): MetadataRoute.Robots {
+  const siteUrl = APP_CONFIG.url;
   return {
-    rules: {
-      userAgent: "*",
-      allow: "/",
-      disallow: [
-        "/api/",
-        "/dashboard/",
-        "/order/",
-      ],
-    },
-    sitemap: new URL("/sitemap.xml", APP_CONFIG.url).toString(),
-    host: APP_CONFIG.url,
+    rules: [
+      {
+        userAgent: "*",
+        allow: ["/", "/pricing", "/contact", "/terms", "/llms.txt", "/llms-full.txt"],
+        disallow: ["/api/", "/dashboard/"],
+      },
+      {
+        userAgent: ["GPTBot", "ChatGPT-User", "ClaudeBot", "PerplexityBot", "Google-Extended", "Applebot-Extended"],
+        allow: ["/", "/pricing", "/contact", "/terms", "/llms.txt", "/llms-full.txt"],
+        disallow: ["/api/", "/dashboard/"],
+      },
+    ],
+    sitemap: new URL("/sitemap.xml", siteUrl).toString(),
+    host: siteUrl,
   };
 }

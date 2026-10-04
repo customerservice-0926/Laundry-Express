@@ -25,6 +25,20 @@ function extractClientIp(req?: RequestLike): string {
   return ip.replace(/[^a-zA-Z0-9.:_-]/g, "");
 }
 
+const memLimits = new Map<string, { count: number; resetAt: number }>();
+
+function checkMemLimit(key: string, limit: number, windowSeconds: number): boolean {
+  const now = Date.now();
+  const entry = memLimits.get(key);
+  if (!entry || now > entry.resetAt) {
+    memLimits.set(key, { count: 1, resetAt: now + windowSeconds * 1000 });
+    return true;
+  }
+  if (entry.count >= limit) return false;
+  entry.count += 1;
+  return true;
+}
+
 export async function consumeRateLimit(
   req: RequestLike | undefined,
   scope: string,
@@ -38,25 +52,40 @@ export async function consumeRateLimit(
 
   // 1. IP-based rate limit check
   const ipKey = crypto.createHmac("sha256", secret).update(`${scope}:ip:${ip}`).digest("hex");
-  const { data: ipAllowed, error: ipError } = await supabase.rpc("consume_auth_rate_limit", {
-    key_input: ipKey,
-    max_hits: limit,
-    window_seconds: windowSeconds,
-  });
-  if (ipError) throw new Error(`Rate limit check failed: ${ipError.message}`);
-  if (ipAllowed !== true) return false;
-
-  // 2. Account/Email subject rate limit check (prevents botnet distributed password guessing)
-  const normSubject = subject.trim().toLowerCase();
-  if (normSubject) {
-    const accKey = crypto.createHmac("sha256", secret).update(`${scope}:account:${normSubject}`).digest("hex");
-    const { data: accAllowed, error: accError } = await supabase.rpc("consume_auth_rate_limit", {
-      key_input: accKey,
+  try {
+    const { data: ipAllowed, error: ipError } = await supabase.rpc("consume_auth_rate_limit", {
+      key_input: ipKey,
       max_hits: limit,
       window_seconds: windowSeconds,
     });
-    if (accError) throw new Error(`Rate limit check failed: ${accError.message}`);
-    if (accAllowed !== true) return false;
+    if (ipError) {
+      console.warn(`[rate-limit] RPC unavailable (${ipError.message}), using memory fallback.`);
+      if (!checkMemLimit(ipKey, limit, windowSeconds)) return false;
+    } else if (ipAllowed !== true) {
+      return false;
+    }
+  } catch {
+    if (!checkMemLimit(ipKey, limit, windowSeconds)) return false;
+  }
+
+  // 2. Account/Email subject rate limit check
+  const normSubject = subject.trim().toLowerCase();
+  if (normSubject) {
+    const accKey = crypto.createHmac("sha256", secret).update(`${scope}:account:${normSubject}`).digest("hex");
+    try {
+      const { data: accAllowed, error: accError } = await supabase.rpc("consume_auth_rate_limit", {
+        key_input: accKey,
+        max_hits: limit,
+        window_seconds: windowSeconds,
+      });
+      if (accError) {
+        if (!checkMemLimit(accKey, limit, windowSeconds)) return false;
+      } else if (accAllowed !== true) {
+        return false;
+      }
+    } catch {
+      if (!checkMemLimit(accKey, limit, windowSeconds)) return false;
+    }
   }
 
   return true;

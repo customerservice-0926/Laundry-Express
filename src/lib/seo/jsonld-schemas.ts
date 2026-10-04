@@ -41,6 +41,7 @@ export function getLocalBusinessSchema(pricing?: PricingConfig | null, settings?
  * Generates FAQ Schema for common customer questions.
  */
 export function getFaqSchema(faqs: FaqItem[] = []) {
+  if (!faqs || faqs.length === 0) return null;
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",

@@ -29,33 +29,37 @@ export class ReviewService {
    * Returns reviews. If onlyApproved is true, returns public approved reviews for landing page.
    */
   static async getReviews(onlyApproved: boolean = false, userId?: string): Promise<OrderReview[]> {
-    const supabase = createAdminSupabaseClient();
-    let q = supabase.from("reviews").select("*").order("created_at", { ascending: false });
-    if (onlyApproved) q = q.eq("status", "approved");
-    if (userId) q = q.eq("user_id", userId);
-    const { data, error } = await q;
-    if (error) throw new Error(`Unable to load reviews: ${error.message}`);
-    return (data || []).map((r) => {
-      const photoUrls = extractPhotoUrls(r.photos);
-      return {
-        id: r.id,
-        order_id: r.order_id,
-        user_id: r.user_id || "",
-        customer_name: r.customer_name || "Verified Customer",
-        rating: Number(r.rating || 5),
-        comment: r.comment || "",
-        status: r.status || "pending",
-        photo_urls: photoUrls,
-        photos: photoUrls.map((url, i) => ({
-          id: `${r.id}-${i}`,
-          review_id: r.id,
-          photo_url: url,
-          display_order: (Math.min(3, i + 1) as 1 | 2 | 3),
+    try {
+      const supabase = createAdminSupabaseClient();
+      let q = supabase.from("reviews").select("*").order("created_at", { ascending: false });
+      if (onlyApproved) q = q.eq("status", "approved");
+      if (userId) q = q.eq("user_id", userId);
+      const { data, error } = await q;
+      if (error || !data) return [];
+      return data.map((r) => {
+        const photoUrls = extractPhotoUrls(r.photos);
+        return {
+          id: r.id,
+          order_id: r.order_id,
+          user_id: r.user_id || "",
+          customer_name: r.customer_name || "Verified Customer",
+          rating: Number(r.rating || 5),
+          comment: r.comment || "",
+          status: r.status || "pending",
+          photo_urls: photoUrls,
+          photos: photoUrls.map((url, i) => ({
+            id: `${r.id}-${i}`,
+            review_id: r.id,
+            photo_url: url,
+            display_order: (Math.min(3, i + 1) as 1 | 2 | 3),
+            created_at: r.created_at,
+          })),
           created_at: r.created_at,
-        })),
-        created_at: r.created_at,
-      };
-    });
+        };
+      });
+    } catch {
+      return [];
+    }
   }
 
   /**

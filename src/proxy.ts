@@ -79,13 +79,14 @@ export async function proxy(req: NextRequest) {
   const isDevelopment = process.env.NODE_ENV !== "production";
   const policy = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://js.stripe.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://js.stripe.com https://maps.googleapis.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
     `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
     "style-src-attr 'unsafe-inline'",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://*.supabase.co https://images.unsplash.com",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://accounts.google.com https://maps.googleapis.com",
-    "frame-src 'self' https://js.stripe.com https://accounts.google.com",
+    "frame-src 'self' https://js.stripe.com https://accounts.google.com https://maps.google.com https://www.google.com",
+    "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

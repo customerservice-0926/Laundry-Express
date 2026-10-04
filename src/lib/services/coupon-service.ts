@@ -18,21 +18,25 @@ const isUuid = (val?: string): boolean =>
 
 export class CouponService {
   static async getCoupons(): Promise<CouponItem[]> {
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase.from("coupons").select("*").order("created_at", { ascending: false });
-    if (error) throw new Error(`Unable to load coupons: ${error.message}`);
-    return (data ?? []).map((item) => ({
-      id: item.id,
-      code: item.code,
-      title: item.title || "",
-      discount_type: item.discount_type,
-      discount_value: Number(item.discount_value ?? 0),
-      min_order_amount: Number(item.min_order_amount ?? 0),
-      max_uses: item.max_uses == null ? undefined : Number(item.max_uses),
-      used_count: Number(item.used_count ?? 0),
-      expires_at: item.expires_at || undefined,
-      is_active: item.is_active ?? true,
-    }));
+    try {
+      const supabase = createAdminSupabaseClient();
+      const { data, error } = await supabase.from("coupons").select("*").order("created_at", { ascending: false });
+      if (error || !data) return [];
+      return data.map((item) => ({
+        id: item.id,
+        code: item.code,
+        title: item.title || "",
+        discount_type: item.discount_type,
+        discount_value: Number(item.discount_value ?? 0),
+        min_order_amount: Number(item.min_order_amount ?? 0),
+        max_uses: item.max_uses == null ? undefined : Number(item.max_uses),
+        used_count: Number(item.used_count ?? 0),
+        expires_at: item.expires_at || undefined,
+        is_active: item.is_active ?? true,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   static async validateCoupon(code: string, subtotal: number): Promise<{ valid: boolean; coupon?: CouponItem; error?: string }> {

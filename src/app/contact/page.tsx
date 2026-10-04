@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/60 overflow-x-clip pt-8 md:pt-10">
+    <div className="min-h-screen flex flex-col bg-slate-50/60 overflow-x-clip pt-12 sm:pt-16">
       {/* Sticky Global Navigation Navbar */}
       <Navbar />
 

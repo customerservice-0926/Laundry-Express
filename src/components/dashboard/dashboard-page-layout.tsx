@@ -20,8 +20,15 @@ export function DashboardPageLayout({
   children,
 }: DashboardPageLayoutProps) {
   const { user, isAdmin, isLoading } = useAuth();
+  const [hasMountedOnce, setHasMountedOnce] = React.useState(false);
 
-  if (isLoading) {
+  React.useEffect(() => {
+    if (!isLoading) {
+      setHasMountedOnce(true);
+    }
+  }, [isLoading]);
+
+  if (!hasMountedOnce && isLoading) {
     return <div className="h-96 rounded-3xl bg-slate-100 animate-pulse m-6" />;
   }
 

@@ -37,16 +37,20 @@ const isUuid = (val?: string): boolean =>
 
 export class ContentService {
   static async getFaqs(): Promise<FaqItem[]> {
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase.from("faqs_and_terms").select("*")
-      .eq("category", "faq").eq("is_active", true).order("sort_order", { ascending: true });
-    if (error) throw new Error(`Unable to load FAQs: ${error.message}`);
-    return (data ?? []).map((item) => ({
-      id: item.id,
-      question: item.title,
-      answer: item.description,
-      display_order: item.sort_order ?? 0,
-    }));
+    try {
+      const supabase = createAdminSupabaseClient();
+      const { data, error } = await supabase.from("faqs_and_terms").select("*")
+        .eq("category", "faq").eq("is_active", true).order("sort_order", { ascending: true });
+      if (error || !data) return [];
+      return data.map((item) => ({
+        id: item.id,
+        question: item.title,
+        answer: item.description,
+        display_order: item.sort_order ?? 0,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   static async saveFaq(faq: Partial<FaqItem>): Promise<FaqItem> {
@@ -86,16 +90,20 @@ export class ContentService {
   }
 
   static async getTerms(): Promise<TermItem[]> {
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase.from("faqs_and_terms").select("*")
-      .in("category", ["term", "guarantee"]).eq("is_active", true).order("sort_order", { ascending: true });
-    if (error) throw new Error(`Unable to load terms: ${error.message}`);
-    return (data ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      subtitle: item.subtitle || "",
-      description: item.description,
-    }));
+    try {
+      const supabase = createAdminSupabaseClient();
+      const { data, error } = await supabase.from("faqs_and_terms").select("*")
+        .in("category", ["term", "guarantee"]).eq("is_active", true).order("sort_order", { ascending: true });
+      if (error || !data) return [];
+      return data.map((item) => ({
+        id: item.id,
+        title: item.title,
+        subtitle: item.subtitle || "",
+        description: item.description,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   static async saveTerm(term: Partial<TermItem>): Promise<TermItem> {
@@ -120,14 +128,18 @@ export class ContentService {
   }
 
   static async getSettings(): Promise<BusinessSettings | null> {
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase
-      .from("system_settings")
-      .select("value")
-      .eq("key", "business_operations")
-      .maybeSingle();
-    if (error) throw new Error(`Unable to load business settings: ${error.message}`);
-    return (data?.value as BusinessSettings | undefined) ?? null;
+    try {
+      const supabase = createAdminSupabaseClient();
+      const { data, error } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "business_operations")
+        .maybeSingle();
+      if (error || !data) return null;
+      return (data?.value as BusinessSettings | undefined) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   static async updateSettings(updates: Partial<BusinessSettings>): Promise<BusinessSettings> {

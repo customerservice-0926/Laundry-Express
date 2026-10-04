@@ -211,23 +211,29 @@ export function FaqsTermsManager() {
       )}
 
       <div className="space-y-3">
-        {filteredItems.map((item) => (
-          <div key={item.id} className="p-4 rounded-2xl border border-slate-200 bg-white flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <span className="font-bold text-slate-900 text-xs block">{item.title}</span>
-              {item.subtitle && <span className="text-[11px] font-semibold text-primary block">{item.subtitle}</span>}
-              <p className="text-xs text-slate-600 leading-relaxed">{item.description}</p>
+        {filteredItems.length === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-6">
+            No {activeTab === "faq" ? "FAQs" : "terms"} added yet. Click &quot;Add {activeTab === "faq" ? "FAQ" : "Term"}&quot; to create one.
+          </p>
+        ) : (
+          filteredItems.map((item) => (
+            <div key={item.id} className="p-4 rounded-2xl border border-slate-200 bg-white flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <span className="font-bold text-slate-900 text-xs block">{item.title}</span>
+                {item.subtitle && <span className="text-[11px] font-semibold text-primary block">{item.subtitle}</span>}
+                <p className="text-xs text-slate-600 leading-relaxed">{item.description}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button size="sm" variant="ghost" onClick={() => handleStartEdit(item)} className="h-7 w-7 p-0 cursor-pointer">
+                  <Edit2 className="h-3.5 w-3.5 text-slate-500" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)} className="h-7 w-7 p-0 cursor-pointer text-rose-600">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Button size="sm" variant="ghost" onClick={() => handleStartEdit(item)} className="h-7 w-7 p-0 cursor-pointer">
-                <Edit2 className="h-3.5 w-3.5 text-slate-500" />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)} className="h-7 w-7 p-0 cursor-pointer text-rose-600">
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
