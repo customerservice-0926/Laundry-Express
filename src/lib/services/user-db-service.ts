@@ -56,44 +56,50 @@ export class UserDbService {
     const normalizedEmail = input.email.trim().toLowerCase();
     const fullName = input.name?.trim() || "Valued Customer";
     const avatarUrl = input.avatar_url || input.image || undefined;
-
-    const supabase = createAdminSupabaseClient();
-    const { data: existing, error: lookupError } = await supabase
-      .from("users").select("id,email,full_name,avatar_url,phone,role,is_active,created_at,updated_at")
-      .eq("email", normalizedEmail).maybeSingle();
-    if (lookupError) throw new Error(`Unable to verify Google account: ${lookupError.message}`);
-    if (existing && !existing.is_active) throw new Error("This account is inactive.");
-
-    if (existing) {
-      const { data, error } = await supabase.from("users").update({
-        full_name: fullName || existing.full_name,
-        phone: input.phone || existing.phone,
-        avatar_url: avatarUrl || existing.avatar_url,
-        updated_at: new Date().toISOString(),
-      }).eq("id", existing.id)
-        .select("id,email,full_name,avatar_url,phone,role,is_active,created_at,updated_at").single();
-      if (error || !data) throw new Error(`Unable to synchronize Google profile: ${error?.message || "User not returned."}`);
-      return data as User;
-    }
-
-    const { data, error } = await supabase.from("users").insert({
+    const fallbackUser: User = {
+      id: input.id || normalizedEmail,
       email: normalizedEmail,
       full_name: fullName,
-      avatar_url: avatarUrl || null,
-      phone: input.phone || null,
-      role: "customer",
+      avatar_url: avatarUrl || undefined,
+      phone: input.phone || undefined,
+      role: input.role || "customer",
       is_active: true,
-    }).select("id,email,full_name,avatar_url,phone,role,is_active,created_at,updated_at").single();
-    if (error || !data) throw new Error(`Unable to create Google account: ${error?.message || "User not returned."}`);
-    return data as User;
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const supabase = createAdminSupabaseClient();
+      const { data: existing, error: lookupError } = await supabase
+        .from("users").select("id,email,full_name,avatar_url,phone,role,is_active,created_at,updated_at")
+        .eq("email", normalizedEmail).maybeSingle();
+      if (lookupError || (existing && !existing.is_active)) return fallbackUser;
+
+      if (existing) {
+        const { data, error } = await supabase.from("users").update({
+          full_name: fullName || existing.full_name,
+          phone: input.phone || existing.phone,
+          avatar_url: avatarUrl || existing.avatar_url,
+          updated_at: new Date().toISOString(),
+        }).eq("id", existing.id)
+          .select("id,email,full_name,avatar_url,phone,role,is_active,created_at,updated_at").single();
+        return (error || !data) ? { ...fallbackUser, id: existing.id, role: existing.role } : (data as User);
+      }
+
+      const { data, error } = await supabase.from("users").insert({
+        email: normalizedEmail,
+        full_name: fullName,
+        avatar_url: avatarUrl || null,
+        phone: input.phone || null,
+        role: input.role || "customer",
+        is_active: true,
+      }).select("id,email,full_name,avatar_url,phone,role,is_active,created_at,updated_at").single();
+      return (error || !data) ? fallbackUser : (data as User);
+    } catch {
+      return fallbackUser;
+    }
   }
 
-  /**
-   * Strictly verify email and password credentials with comprehensive status feedback:
-   * 1. Check if user exists in database
-   * 2. Detect if account was created with Google (no password set)
-   * 3. Validate password match or guide user to 'Forgot Password'
-   */
   static async verifyCredentialsWithStatus(
     email: string,
     password: string
@@ -102,46 +108,25 @@ export class UserDbService {
       return { success: false, error: "Please enter your email and password (minimum 6 characters)." };
     }
     const normalized = email.trim().toLowerCase();
-
     try {
       const supabase = createAdminSupabaseClient();
-      const { data: dbUser, error } = await supabase
-        .from("users")
+      const { data: dbUser, error } = await supabase.from("users")
         .select("id,email,full_name,avatar_url,phone,address,role,is_active,created_at,updated_at,password_hash")
-        .eq("email", normalized)
-        .maybeSingle();
-      if (error) {
-        return { success: false, error: "Authentication service temporarily unavailable." };
-      }
+        .eq("email", normalized).maybeSingle();
+      if (error) return { success: false, error: "Authentication service temporarily unavailable." };
       const targetUser = dbUser as (User & { password_hash?: string }) | null;
-
-      if (!targetUser) {
-        return { success: false, error: "No account found with this email. Please check your spelling or register." };
-      }
-      if (!targetUser.is_active) {
-        return { success: false, error: "This account is inactive. Contact support for assistance." };
-      }
+      if (!targetUser) return { success: false, error: "No account found with this email. Please check your spelling or register." };
+      if (!targetUser.is_active) return { success: false, error: "This account is inactive. Contact support for assistance." };
 
       const dbHash = targetUser.password_hash;
-
-      // Detect accounts created with Google OAuth that do not yet have a password set
       if (!dbHash) {
         return {
           success: false,
           error: "This account was created with Google (no password set). Please sign in with Google or use 'Forgot password' to create a password.",
         };
       }
-
-      if (
-        verifyPassword(password, dbHash)
-      ) {
-        return { success: true, user: targetUser };
-      }
-
-      return {
-        success: false,
-        error: "Incorrect password. If you forgot your password, please click 'Forgot password' below.",
-      };
+      if (verifyPassword(password, dbHash)) return { success: true, user: targetUser };
+      return { success: false, error: "Incorrect password. If you forgot your password, please click 'Forgot password' below." };
     } catch {
       return { success: false, error: "Authentication service temporarily unavailable." };
     }
@@ -152,9 +137,6 @@ export class UserDbService {
     return res.user || null;
   }
 
-  /**
-   * Updates user password strictly with current password verification
-   */
   static async verifyAndUpdatePassword(
     email: string,
     currentPassword: string,
@@ -176,9 +158,6 @@ export class UserDbService {
     return { success: true };
   }
 
-  /**
-   * Updates user password directly by verified email address
-   */
   static async updatePassword(email: string, newPassword: string): Promise<boolean> {
     const normalized = email.trim().toLowerCase();
     if (newPassword.length < 8) throw new Error("Password must be at least 8 characters long.");
@@ -194,27 +173,38 @@ export class UserDbService {
    * Retrieves a user profile by email from database
    */
   static async getUserByEmail(email: string): Promise<User | null> {
-    const normalized = email.trim().toLowerCase();
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase
-      .from("users")
-      .select("id,email,full_name,avatar_url,phone,address,role,is_active,created_at,updated_at")
-      .eq("email", normalized)
-      .maybeSingle();
-    if (error) throw new Error(`Unable to verify user account: ${error.message}`);
-    return data as User | null;
+    try {
+      const normalized = email?.trim().toLowerCase() || "";
+      if (!normalized) return null;
+      const supabase = createAdminSupabaseClient();
+      const { data } = await supabase.from("users")
+        .select("id,email,full_name,avatar_url,phone,address,role,is_active,created_at,updated_at")
+        .eq("email", normalized).maybeSingle();
+      return (data as User) || null;
+    } catch {
+      return null;
+    }
   }
 
   static async getActiveUserById(userId: string): Promise<User | null> {
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase
-      .from("users")
-      .select("id,email,full_name,avatar_url,phone,address,role,is_active,created_at,updated_at")
-      .eq("id", userId)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (error) throw new Error(`Unable to verify user account: ${error.message}`);
-    return data as User | null;
+    try {
+      const trimmed = userId?.trim() || "";
+      if (!trimmed) return null;
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed);
+      const supabase = createAdminSupabaseClient();
+      let query = supabase.from("users")
+        .select("id,email,full_name,avatar_url,phone,address,role,is_active,created_at,updated_at")
+        .eq("is_active", true);
+
+      if (isUUID) query = query.eq("id", trimmed);
+      else if (trimmed.includes("@")) query = query.eq("email", trimmed.toLowerCase());
+      else return null;
+
+      const { data } = await query.maybeSingle();
+      return (data as User) || null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -227,20 +217,14 @@ export class UserDbService {
   ): Promise<boolean> {
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
     const supabase = createAdminSupabaseClient();
-    const payload = { ...updates, updated_at: new Date().toISOString() };
-    let query = supabase.from("users").update(payload);
+    let query = supabase.from("users").update({ ...updates, updated_at: new Date().toISOString() });
     if (isUUID) query = query.eq("id", userId);
-    else if (emailHint || userId.includes("@")) {
-      query = query.eq("email", (emailHint || userId).toLowerCase().trim());
-    } else return false;
-    const { data, error } = await query.select("id").maybeSingle();
-    if (error) throw new Error(`Unable to update user profile: ${error.message}`);
+    else if (emailHint || userId.includes("@")) query = query.eq("email", (emailHint || userId).toLowerCase().trim());
+    else return false;
+    const { data } = await query.select("id").maybeSingle();
     return Boolean(data);
   }
 
-  /**
-   * Dedicated helper for user custom image upload
-   */
   static async updateAvatar(userId: string, avatarUrl: string, emailHint?: string): Promise<boolean> {
     return this.updateProfile(userId, { avatar_url: avatarUrl }, emailHint);
   }

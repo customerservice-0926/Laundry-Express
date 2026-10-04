@@ -25,7 +25,7 @@ export async function proxy(req: NextRequest) {
   const token = isAdminRoute || isOrderRoute || isDashboardRoute || isAuthRoute
     ? await getToken({ req, secret: getAuthSecret() })
     : null;
-  const isAuthenticated = Boolean(token);
+  const isAuthenticated = Boolean(token && (token.id || token.email || token.sub));
   const isAdmin = token?.role === "admin";
 
   // 1. Guard legacy /admin routes - strictly require admin role
@@ -70,8 +70,9 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // 4. Prevent already authenticated users from landing on auth pages
-  if (isAuthRoute && isAuthenticated) {
+  // 4. Prevent already authenticated users from landing on auth pages (unless explicit error/logout)
+  const isAuthErrorOrLogout = searchParams.has("error") || searchParams.has("logout");
+  if (isAuthRoute && isAuthenticated && !isAuthErrorOrLogout) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

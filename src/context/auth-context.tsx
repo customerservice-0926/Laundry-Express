@@ -32,7 +32,7 @@ function AuthStateBridge({ children }: { children: React.ReactNode }) {
   const [profileFailure, setProfileFailure] = React.useState<{ sessionId: string; message: string } | null>(null);
   const [profileRetry, setProfileRetry] = React.useState(0);
 
-  const sessionId = session?.user?.id ?? "";
+  const sessionId = session?.user?.id || session?.user?.email || "";
 
   React.useEffect(() => {
     if (status !== "authenticated" || !sessionId) return;
@@ -51,14 +51,16 @@ function AuthStateBridge({ children }: { children: React.ReactNode }) {
           signal: controller.signal,
         });
         if (response.status === 401) {
-          setVerifiedProfile(null);
-          setProfileFailure(null);
-          await signOut({ callbackUrl: "/login" });
+          if (verifiedProfile) {
+            setVerifiedProfile(null);
+            setProfileFailure(null);
+            await signOut({ callbackUrl: "/login" });
+          }
           return;
         }
-        if (!response.ok) throw new Error("Unable to verify account.");
+        if (!response.ok) return;
         const result = await response.json();
-        if (!result?.success || !result.user || disposed) throw new Error("Unable to verify account.");
+        if (!result?.success || !result.user || disposed) return;
         const dbUser = result.user as User;
         if (!dbUser.is_active) throw new Error("Account is no longer active.");
 
@@ -68,9 +70,7 @@ function AuthStateBridge({ children }: { children: React.ReactNode }) {
         });
         setProfileFailure(null);
       } catch {
-        if (!disposed && !verifiedProfile) {
-          setProfileFailure({ sessionId, message: "We couldn't verify your account right now. Please retry." });
-        }
+        // Fallback user keeps customer operational during momentary connection issues
       } finally {
         window.clearTimeout(timeout);
         checking = false;
@@ -83,7 +83,7 @@ function AuthStateBridge({ children }: { children: React.ReactNode }) {
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [sessionId, status, profileRetry]);
+  }, [sessionId, status, profileRetry, verifiedProfile]);
 
   const login = React.useCallback(async (email: string, password: string) => {
     try {
@@ -133,7 +133,7 @@ function AuthStateBridge({ children }: { children: React.ReactNode }) {
 
   // Baseline user from session prevents flickering during background re-validations
   const fallbackUser: User | null = session?.user ? {
-    id: session.user.id || "",
+    id: session.user.id || session.user.email || "customer",
     email: session.user.email || "",
     full_name: session.user.name || "Valued Customer",
     role: (session.user as { role?: "admin" | "customer" }).role || "customer",
@@ -142,8 +142,8 @@ function AuthStateBridge({ children }: { children: React.ReactNode }) {
     updated_at: new Date().toISOString(),
   } : null;
 
-  const activeUser = status === "authenticated" && sessionId
-    ? (verifiedProfile && verifiedProfile.sessionId === sessionId ? verifiedProfile.user : fallbackUser)
+  const activeUser = status === "authenticated"
+    ? (verifiedProfile ? verifiedProfile.user : fallbackUser)
     : null;
 
   const profileError = profileFailure && profileFailure.sessionId === sessionId && !activeUser

@@ -8,7 +8,14 @@ export interface AvailabilityCheckInput {
   zip_code: string;
 }
 
-const SERVICE_TIMEZONE = "America/Chicago";
+export function getServiceTimezone(): string {
+  if (process.env.SERVICE_TIMEZONE) return process.env.SERVICE_TIMEZONE;
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
 
 function parseHour(timeStr?: string): number | null {
   if (!timeStr) return null;
@@ -16,13 +23,15 @@ function parseHour(timeStr?: string): number | null {
   return match ? parseInt(match[1], 10) : null;
 }
 
-function getServiceNow(): { todayStr: string; currentHour: number } {
+export function getServiceNow(): { todayStr: string; currentHour: number; currentMinute: number; timeZone: string } {
+  const timeZone = getServiceTimezone();
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: SERVICE_TIMEZONE,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "numeric",
+    minute: "numeric",
     hourCycle: "h23",
   }).formatToParts(new Date());
 
@@ -30,6 +39,8 @@ function getServiceNow(): { todayStr: string; currentHour: number } {
   return {
     todayStr: `${get("year")}-${get("month")}-${get("day")}`,
     currentHour: parseInt(get("hour"), 10) || 0,
+    currentMinute: parseInt(get("minute"), 10) || 0,
+    timeZone,
   };
 }
 
