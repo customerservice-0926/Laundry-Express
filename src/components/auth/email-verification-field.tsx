@@ -14,8 +14,19 @@ export function EmailVerificationField({
 }) {
   const { sendOtp } = useAuth();
   const [sending, setSending] = React.useState(false);
+  const [codeValue, setCodeValue] = React.useState("");
   const [message, setMessage] = React.useState("");
   const [error, setError] = React.useState("");
+
+  React.useEffect(() => {
+    if (codeValue) onCodeChange(codeValue);
+  }, [codeValue, onCodeChange]);
+
+  const handleChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, "");
+    setCodeValue(cleaned);
+    onCodeChange(cleaned);
+  };
 
   const sendCode = async () => {
     setMessage("");
@@ -44,7 +55,8 @@ export function EmailVerificationField({
           maxLength={6}
           required
           placeholder="Email verification code"
-          onChange={(event) => onCodeChange(event.target.value.replace(/\D/g, ""))}
+          value={codeValue}
+          onChange={(event) => handleChange(event.target.value)}
           className="min-w-0 flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
         />
         <button

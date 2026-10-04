@@ -43,7 +43,7 @@ export default async function PricingPage() {
   const pricing = await PricingPlanService.getPricing().catch(() => null);
 
   return (
-    <div className="min-h-screen flex flex-col bg-white overflow-x-clip pt-8 md:pt-10">
+    <div className="min-h-screen flex flex-col bg-white overflow-x-clip pt-12 sm:pt-16">
       {/* Sticky Global Navigation Navbar */}
       <Navbar />
 

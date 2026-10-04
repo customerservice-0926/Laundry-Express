@@ -55,8 +55,7 @@ export async function POST(req: NextRequest) {
     if (availabilityError) return NextResponse.json({ success: false, error: availabilityError }, { status: 400 });
 
     const paymentMethod = body.payment_method;
-    const isOnline = paymentMethod !== "cash_on_delivery";
-    if (isOnline && !stripe) return NextResponse.json({ success: false, error: "Online payment is temporarily unavailable." }, { status: 503 });
+    if (!stripe) return NextResponse.json({ success: false, error: "Online payment is temporarily unavailable." }, { status: 503 });
 
     const pricing = await PricingPlanService.getPricing();
     if (!pricing) return NextResponse.json({ success: false, error: "Pricing has not been configured. Please try again later." }, { status: 503 });
@@ -93,15 +92,12 @@ export async function POST(req: NextRequest) {
     });
 
     const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin;
-    let origin: string | undefined;
-    if (isOnline) {
-      const originUrl = new URL(configuredOrigin);
-      if (originUrl.protocol !== "https:" && originUrl.hostname !== "localhost") {
-        return NextResponse.json({ success: false, error: "Checkout requires a secure site URL." }, { status: 503 });
-      }
-      origin = originUrl.origin;
-      if (Math.round(serverPrice.total_amount * 100) < 50) return NextResponse.json({ success: false, error: "The order total is below Stripe's minimum payment amount." }, { status: 400 });
+    const originUrl = new URL(configuredOrigin);
+    if (originUrl.protocol !== "https:" && originUrl.hostname !== "localhost") {
+      return NextResponse.json({ success: false, error: "Checkout requires a secure site URL." }, { status: 503 });
     }
+    const origin = originUrl.origin;
+    if (Math.round(serverPrice.total_amount * 100) < 50) return NextResponse.json({ success: false, error: "The order total is below Stripe's minimum payment amount." }, { status: 400 });
 
     const createdOrder = await OrderService.createOrder({
       ...body, detergent_name: detergent.name, user_id: user.id, customer_name: user.full_name, customer_email: user.email,
@@ -112,60 +108,56 @@ export async function POST(req: NextRequest) {
 
     await syncUserOrderContact(user, body);
 
-    if (isOnline && stripe) {
-      const netServiceAmountCents = Math.round((serverPrice.subtotal + serverPrice.detergent_fee - serverPrice.discount_amount) * 100);
-      const deliveryFeeCents = Math.round(serverPrice.delivery_fee * 100);
-      const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `Laundry Express — ${createdOrder.pricing_mode === "per_bag" ? "By The Bag Wash & Fold" : createdOrder.pricing_mode === "package" ? "Saver Package Credit" : "By The Pound (lb)"}`,
-              description: `${createdOrder.pricing_mode === "per_bag" ? `${createdOrder.bag_count || 1} Bag(s)` : `${createdOrder.estimated_weight_lbs || 15} lbs`} • Cold Water Gentle Care • 24hr Return`,
-              images: [`${origin}/brand/logo-badge.jpg`],
-            },
-            unit_amount: netServiceAmountCents,
+    const netServiceAmountCents = Math.round((serverPrice.subtotal + serverPrice.detergent_fee - serverPrice.discount_amount) * 100);
+    const deliveryFeeCents = Math.round(serverPrice.delivery_fee * 100);
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: `Laundry Express — ${createdOrder.pricing_mode === "per_bag" ? "By The Bag Wash & Fold" : createdOrder.pricing_mode === "package" ? "Saver Package Credit" : "By The Pound (lb)"}`,
+            description: `${createdOrder.pricing_mode === "per_bag" ? `${createdOrder.bag_count || 1} Bag(s)` : `${createdOrder.estimated_weight_lbs || 15} lbs`} • Cold Water Gentle Care • 24hr Return`,
+            images: [`${origin}/brand/logo-badge.jpg`],
           },
-          quantity: 1,
+          unit_amount: netServiceAmountCents,
         },
-      ];
+        quantity: 1,
+      },
+    ];
 
-      if (deliveryFeeCents > 0) {
-        lineItems.push({
-          price_data: { currency: "usd", product_data: { name: "Doorstep Pickup & Return Delivery", description: "Doorstep pickup and 24hr return delivery" }, unit_amount: deliveryFeeCents },
-          quantity: 1,
-        });
-      }
-
-      let session: Stripe.Checkout.Session;
-      try {
-        session = await stripe.checkout.sessions.create({
-          payment_method_types: ["card"], line_items: lineItems, mode: "payment", customer_email: user.email,
-          success_url: `${origin}/dashboard/orders?checkout=complete&order_id=${encodeURIComponent(createdOrder.order_number)}`,
-          cancel_url: `${origin}/order?canceled=true&order_id=${createdOrder.order_number}`,
-          metadata: { order_id: createdOrder.id, order_number: createdOrder.order_number, user_id: createdOrder.user_id || "", pickup_date: createdOrder.pickup_date || "", pickup_slot: createdOrder.pickup_slot || "" },
-          payment_intent_data: { metadata: { order_number: createdOrder.order_number, order_id: createdOrder.id } },
-        });
-      } catch (error) {
-        await OrderService.markOrderPaymentFailed(createdOrder.order_number);
-        throw error;
-      }
-
-      try {
-        await OrderService.saveCheckoutSessionId(createdOrder.id, session.id);
-      } catch (error) {
-        try { await stripe.checkout.sessions.expire(session.id); await OrderService.markOrderPaymentFailed(createdOrder.id); } catch {}
-        throw error;
-      }
-      if (!session.url) {
-        try { await stripe.checkout.sessions.expire(session.id); await OrderService.markOrderPaymentFailed(createdOrder.id); } catch {}
-        throw new Error("Stripe did not provide a checkout URL.");
-      }
-
-      return NextResponse.json({ success: true, checkoutUrl: session.url, order: createdOrder }, { status: 201 });
+    if (deliveryFeeCents > 0) {
+      lineItems.push({
+        price_data: { currency: "usd", product_data: { name: "Doorstep Pickup & Return Delivery", description: "Doorstep pickup and 24hr return delivery" }, unit_amount: deliveryFeeCents },
+        quantity: 1,
+      });
     }
 
-    return NextResponse.json({ success: true, order: createdOrder, isCash: true }, { status: 201 });
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"], line_items: lineItems, mode: "payment", customer_email: user.email,
+        success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}&order_id=${encodeURIComponent(createdOrder.order_number)}`,
+        cancel_url: `${origin}/order?canceled=true&order_id=${createdOrder.order_number}`,
+        metadata: { order_id: createdOrder.id, order_number: createdOrder.order_number, user_id: createdOrder.user_id || "", pickup_date: createdOrder.pickup_date || "", pickup_slot: createdOrder.pickup_slot || "" },
+        payment_intent_data: { metadata: { order_number: createdOrder.order_number, order_id: createdOrder.id } },
+      });
+    } catch (error) {
+      await OrderService.markOrderPaymentFailed(createdOrder.order_number);
+      throw error;
+    }
+
+    try {
+      await OrderService.saveCheckoutSessionId(createdOrder.id, session.id);
+    } catch (error) {
+      try { await stripe.checkout.sessions.expire(session.id); await OrderService.markOrderPaymentFailed(createdOrder.id); } catch {}
+      throw error;
+    }
+    if (!session.url) {
+      try { await stripe.checkout.sessions.expire(session.id); await OrderService.markOrderPaymentFailed(createdOrder.id); } catch {}
+      throw new Error("Stripe did not provide a checkout URL.");
+    }
+
+    return NextResponse.json({ success: true, checkoutUrl: session.url, order: createdOrder }, { status: 201 });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to create checkout session";
     if (msg.includes("fully booked")) {

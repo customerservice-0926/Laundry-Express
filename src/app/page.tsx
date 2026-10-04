@@ -42,7 +42,10 @@ export default async function HomePage() {
   const [pricing, settings, faqs] = await Promise.all([
     PricingPlanService.getPricing().catch(() => null),
     ContentService.getSettings().catch(() => null),
-    ContentService.getFaqs(),
+    ContentService.getFaqs().catch((error: unknown) => {
+      console.error("Unable to load FAQs for homepage structured data:", error);
+      return [];
+    }),
   ]);
   const localBusinessJsonLd = getLocalBusinessSchema(pricing, settings);
   const faqJsonLd = getFaqSchema(faqs);
@@ -60,10 +63,12 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(localBusinessJsonLd) }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
-      />
+      {faqJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
+        />
+      )}
 
       {/* Sticky Main Navigation Bar */}
       <Navbar />

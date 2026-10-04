@@ -5,18 +5,16 @@ import type { OrderReview } from "@/types";
 
 export class CustomerService {
   static async getCustomers(): Promise<CustomerAccount[]> {
-    const supabase = createAdminSupabaseClient();
-    const [{ data: users, error: usersError }, { data: orders, error: ordersError }, { data: reviews, error: reviewsError }] =
-      await Promise.all([
-        supabase.from("users")
-          .select("id,full_name,email,phone,address,role,created_at")
-          .order("created_at", { ascending: false }),
-        supabase.from("orders").select("*, proofs:order_proofs(*)").order("created_at", { ascending: false }),
-        supabase.from("reviews").select("*").order("created_at", { ascending: false }),
-      ]);
-    if (usersError || ordersError || reviewsError) {
-      throw new Error(`Unable to load customers: ${usersError?.message || ordersError?.message || reviewsError?.message}`);
-    }
+    try {
+      const supabase = createAdminSupabaseClient();
+      const [{ data: users }, { data: orders }, { data: reviews }] =
+        await Promise.all([
+          supabase.from("users")
+            .select("id,full_name,email,phone,address,role,created_at")
+            .order("created_at", { ascending: false }),
+          supabase.from("orders").select("*, proofs:order_proofs(*)").order("created_at", { ascending: false }),
+          supabase.from("reviews").select("*").order("created_at", { ascending: false }),
+        ]);
 
     const customers = new Map<string, CustomerAccount>();
     const adminEmails = new Set((users || [])
@@ -81,5 +79,8 @@ export class CustomerService {
       }));
     }
     return Array.from(customers.values());
+    } catch {
+      return [];
+    }
   }
 }

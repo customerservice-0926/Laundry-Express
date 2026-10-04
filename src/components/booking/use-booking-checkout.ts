@@ -23,7 +23,7 @@ export interface CheckoutPayload {
   notes: string;
   priceResult: { subtotal: number; detergent_fee: number; delivery_fee: number; discount_amount: number; total_amount: number };
   coupon?: CouponItem;
-  paymentMethod: "card" | "apple_pay" | "cash_on_delivery";
+  paymentMethod: "card" | "apple_pay";
 }
 
 export function useBookingCheckout() {
@@ -85,7 +85,7 @@ export function useBookingCheckout() {
         return;
       }
 
-      window.location.assign(`/dashboard/orders?order_id=${encodeURIComponent(data.order.order_number)}`);
+      window.location.assign(`/order/success?order_id=${encodeURIComponent(data.order.order_number)}`);
     } catch (error) {
       setCheckoutError(error instanceof Error ? error.message : "Unable to place your order. Please try again.");
     } finally {

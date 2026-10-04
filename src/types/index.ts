@@ -173,7 +173,7 @@ export interface PaymentRecord {
   payment_number: string;
   order_id: string;
   user_id: string;
-  provider: "stripe" | "cash_on_delivery" | "package_credit";
+  provider: "stripe" | "package_credit";
   provider_payment_id?: string;
   amount: number;
   currency: string;

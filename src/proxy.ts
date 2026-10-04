@@ -25,7 +25,7 @@ export async function proxy(req: NextRequest) {
   const token = isAdminRoute || isOrderRoute || isDashboardRoute || isAuthRoute
     ? await getToken({ req, secret: getAuthSecret() })
     : null;
-  const isAuthenticated = Boolean(token);
+  const isAuthenticated = Boolean(token && (token.id || token.email || token.sub));
   const isAdmin = token?.role === "admin";
 
   // 1. Guard legacy /admin routes - strictly require admin role
@@ -70,8 +70,9 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // 4. Prevent already authenticated users from landing on auth pages
-  if (isAuthRoute && isAuthenticated) {
+  // 4. Prevent already authenticated users from landing on auth pages (unless explicit error/logout)
+  const isAuthErrorOrLogout = searchParams.has("error") || searchParams.has("logout");
+  if (isAuthRoute && isAuthenticated && !isAuthErrorOrLogout) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
@@ -79,13 +80,14 @@ export async function proxy(req: NextRequest) {
   const isDevelopment = process.env.NODE_ENV !== "production";
   const policy = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://js.stripe.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://js.stripe.com https://maps.googleapis.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
     `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
     "style-src-attr 'unsafe-inline'",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://*.supabase.co https://images.unsplash.com",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://accounts.google.com https://maps.googleapis.com",
-    "frame-src 'self' https://js.stripe.com https://accounts.google.com",
+    "frame-src 'self' https://js.stripe.com https://accounts.google.com https://maps.google.com https://www.google.com",
+    "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

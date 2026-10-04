@@ -29,20 +29,24 @@ export interface PricingConfig {
 
 export class PricingPlanService {
   static async getPlans(): Promise<PackagePlan[]> {
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase.from("plans").select("*").order("created_at", { ascending: true });
-    if (error) throw new Error(`Unable to load packages: ${error.message}`);
-    return (data ?? []).map((item) => ({
-      id: item.id,
-      name: item.title,
-      description: item.description || "",
-      unit_type: item.package_type === "weight_tier" ? "lb" : "bag",
-      capacity: Number(item.package_type === "weight_tier" ? item.included_lbs : item.included_bags),
-      original_price: Number(item.price),
-      discounted_price: Number(item.price),
-      key_points: Array.isArray(item.key_points) ? item.key_points : [],
-      is_active: item.is_active ?? true,
-    }));
+    try {
+      const supabase = createAdminSupabaseClient();
+      const { data, error } = await supabase.from("plans").select("*").order("created_at", { ascending: true });
+      if (error || !data) return [];
+      return data.map((item) => ({
+        id: item.id,
+        name: item.title,
+        description: item.description || "",
+        unit_type: item.package_type === "weight_tier" ? "lb" : "bag",
+        capacity: Number(item.package_type === "weight_tier" ? item.included_lbs : item.included_bags),
+        original_price: Number(item.price),
+        discounted_price: Number(item.price),
+        key_points: Array.isArray(item.key_points) ? item.key_points : [],
+        is_active: item.is_active ?? true,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   static async savePlan(plan: Partial<PackagePlan>): Promise<PackagePlan> {
@@ -118,44 +122,46 @@ export class PricingPlanService {
   }
 
   static async getPricing(): Promise<PricingConfig | null> {
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase
-      .from("pricing_configs")
-      .select("*")
-      .eq("is_active", true);
-    if (error) throw new Error(`Unable to load pricing: ${error.message}`);
-    const bagRow = data?.find((row) => row.pricing_type === "per_bag");
-    const lbRow = data?.find((row) => row.pricing_type === "per_lb");
-    if (!bagRow || !lbRow) return null;
+    try {
+      const supabase = createAdminSupabaseClient();
+      const { data, error } = await supabase
+        .from("pricing_configs")
+        .select("*")
+        .eq("is_active", true);
+      if (error || !data) return null;
+      const bagRow = data.find((row) => row.pricing_type === "per_bag");
+      const lbRow = data.find((row) => row.pricing_type === "per_lb");
+      if (!bagRow || !lbRow) return null;
 
-    const bPrice = Number(bagRow.unit_price);
-    const pPrice = Number(lbRow.unit_price);
-    const dFee = Number(bagRow.standard_delivery_fee);
-    const minLbs = Number(lbRow.min_order_quantity);
-    const maxLbs = Number(lbRow.max_orders_per_slot);
-    const freeDeliveryLbs = Number(lbRow.free_delivery_threshold);
-    const freeDeliveryBags = Number(bagRow.free_delivery_threshold);
-    const minBags = Number(bagRow.min_order_quantity);
-    const maxBags = Number(bagRow.max_orders_per_slot);
-    const values = [bPrice, pPrice, dFee, minLbs, maxLbs, freeDeliveryLbs, freeDeliveryBags, minBags, maxBags];
-    if (values.some((value) => !Number.isFinite(value))) {
-      throw new Error("Pricing settings contain invalid values.");
+      const bPrice = Number(bagRow.unit_price);
+      const pPrice = Number(lbRow.unit_price);
+      const dFee = Number(bagRow.standard_delivery_fee);
+      const minLbs = Number(lbRow.min_order_quantity);
+      const maxLbs = Number(lbRow.max_orders_per_slot);
+      const freeDeliveryLbs = Number(lbRow.free_delivery_threshold);
+      const freeDeliveryBags = Number(bagRow.free_delivery_threshold);
+      const minBags = Number(bagRow.min_order_quantity);
+      const maxBags = Number(bagRow.max_orders_per_slot);
+      const values = [bPrice, pPrice, dFee, minLbs, maxLbs, freeDeliveryLbs, freeDeliveryBags, minBags, maxBags];
+      if (values.some((value) => !Number.isFinite(value))) return null;
+
+      return {
+        bag_price: bPrice,
+        min_bags: minBags,
+        max_bags: maxBags,
+        pound_price: pPrice,
+        min_lbs: minLbs,
+        max_lbs: maxLbs,
+        free_delivery_lbs: freeDeliveryLbs,
+        free_delivery_threshold: freeDeliveryBags,
+        standard_delivery_fee: dFee,
+        base_bag_price: bPrice,
+        base_pound_price: pPrice,
+        one_bag_delivery_fee: dFee,
+      };
+    } catch {
+      return null;
     }
-
-    return {
-      bag_price: bPrice,
-      min_bags: minBags,
-      max_bags: maxBags,
-      pound_price: pPrice,
-      min_lbs: minLbs,
-      max_lbs: maxLbs,
-      free_delivery_lbs: freeDeliveryLbs,
-      free_delivery_threshold: freeDeliveryBags,
-      standard_delivery_fee: dFee,
-      base_bag_price: bPrice,
-      base_pound_price: pPrice,
-      one_bag_delivery_fee: dFee,
-    };
   }
 
   static async updatePricing(updates: Partial<PricingConfig>): Promise<PricingConfig> {

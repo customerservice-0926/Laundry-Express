@@ -21,21 +21,12 @@ export function ResetPasswordView() {
 
   const { resetPasswordWithOtp, sendOtp } = useAuth();
 
-  const [email, setEmail] = React.useState(() => {
-    if (initialEmail) return initialEmail;
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("laundry_reset_email") || "";
-    }
-    return "";
-  });
-
-  React.useEffect(() => {
-    if (email && typeof window !== "undefined") {
-      sessionStorage.setItem("laundry_reset_email", email);
-    }
-  }, [email]);
-
+  const [email, setEmail] = React.useState(initialEmail);
   const [otpCode, setOtpCode] = React.useState("");
+
+  const handleOtpChange = (val: string) => {
+    setOtpCode(val.replace(/\D/g, ""));
+  };
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -188,7 +179,7 @@ export function ResetPasswordView() {
               maxLength={6}
               placeholder="e.g. 123456"
               value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+              onChange={(e) => handleOtpChange(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-base tracking-widest text-center focus:ring-2 focus:ring-primary font-bold"
             />
           </div>

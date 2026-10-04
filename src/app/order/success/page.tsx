@@ -3,31 +3,44 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, ArrowRight, FileText, Loader2, Home, Mail, Check } from "lucide-react";
+import { CheckCircle2, ArrowRight, FileText, Loader2, Home, Mail, Check, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
 import { downloadInvoiceAsPdf } from "@/lib/invoice/pdf-invoice-generator";
+import { orderToUnifiedInvoice } from "@/lib/invoice/invoice-utils";
+import { OrderInvoiceCard } from "@/components/booking/order-invoice-card";
 import { useOrdersRealtime } from "@/hooks/use-orders-realtime";
-import type { InvoiceData } from "@/components/booking/order-invoice-modal";
 import type { Order } from "@/types";
-import { formatSlotLabel, resolveDetergentName } from "@/lib/utils";
-import { OrderSummaryCard } from "./order-summary-card";
 
 function SuccessContent() {
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get("session_id"), orderId = searchParams.get("order_id") || "LX-CONFIRMED";
+  const sessionId = searchParams.get("session_id");
+  const orderId = searchParams.get("order_id") || "LX-CONFIRMED";
   const [order, setOrder] = React.useState<Order | null>(null);
-  const [isPdfGenerating, setIsPdfGenerating] = React.useState(false), [isSendingEmail, setIsSendingEmail] = React.useState(false);
-  const [emailSent, setEmailSent] = React.useState(false), [paid, setPaid] = React.useState(false);
+  const [isPdfGenerating, setIsPdfGenerating] = React.useState(false);
+  const [isSendingEmail, setIsSendingEmail] = React.useState(false);
+  const [emailSent, setEmailSent] = React.useState(false);
+  const [paid, setPaid] = React.useState(false);
   const [isStatusChecked, setIsStatusChecked] = React.useState(false);
-  const [statusError, setStatusError] = React.useState(""), [actionError, setActionError] = React.useState("");
+  const [statusError, setStatusError] = React.useState("");
+  const [actionError, setActionError] = React.useState("");
   const [slotTimes, setSlotTimes] = React.useState({ s1: "", e1: "", s2: "", e2: "" });
 
   React.useEffect(() => {
-    fetch("/api/content?type=settings").then((r) => r.json()).then((d) => {
-      if (d?.settings) setSlotTimes({ s1: d.settings.slot1_start || "", e1: d.settings.slot1_end || "", s2: d.settings.slot2_start || "", e2: d.settings.slot2_end || "" });
-    }).catch(() => {});
+    fetch("/api/content?type=settings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.settings) {
+          setSlotTimes({
+            s1: d.settings.slot1_start || "",
+            e1: d.settings.slot1_end || "",
+            s2: d.settings.slot2_start || "",
+            e2: d.settings.slot2_end || "",
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const checkStatus = React.useCallback(async () => {
@@ -59,7 +72,9 @@ function SuccessContent() {
   });
 
   React.useEffect(() => {
-    let active = true, timer: ReturnType<typeof setTimeout>, attempts = 0;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    let attempts = 0;
     const runCheck = async () => {
       const done = await checkStatus();
       if (!active || done) return;
@@ -71,8 +86,16 @@ function SuccessContent() {
       }
     };
     void runCheck();
-    return () => { active = false; clearTimeout(timer); };
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [checkStatus]);
+
+  const invoiceData = React.useMemo(() => {
+    if (!order) return null;
+    return orderToUnifiedInvoice(order, { slotTimes });
+  }, [order, slotTimes]);
 
   if (!order && !isStatusChecked) {
     return (
@@ -83,6 +106,7 @@ function SuccessContent() {
       </div>
     );
   }
+
   if (!order) {
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
@@ -93,47 +117,40 @@ function SuccessContent() {
     );
   }
 
-  const customerName = order.customer_name || "Valued Customer", customerEmail = order.customer_email || "";
-  const fullAddress = [order.street_address, order.apt_unit ? `Apt ${order.apt_unit}` : "", order.city, order.state, order.zip_code].filter(Boolean).join(", ") || order.pickup_address || "Doorstep Address";
-  const slotLabel = slotTimes.s1 && slotTimes.e1 && slotTimes.s2 && slotTimes.e2 && (order.pickup_slot === "8am-12pm" || order.pickup_slot === "1pm-6pm")
-    ? formatSlotLabel(order.pickup_slot as "8am-12pm" | "1pm-6pm", slotTimes.s1, slotTimes.e1, slotTimes.s2, slotTimes.e2) : order.pickup_slot || "Scheduled Window";
-
-  const getInvoiceData = (): InvoiceData => ({
-    orderId: order.order_number || orderId,
-    orderDate: order.created_at ? new Date(order.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    pickupDate: order.pickup_date || new Date().toISOString().split("T")[0], pickupSlot: slotLabel,
-    deliveryDate: order.delivery_date || new Date(Date.now() + 86400000).toISOString().split("T")[0],
-    paymentMethod: order.payment_method === "card" ? "Credit / Debit Card (Stripe)" : "Stripe 256-bit Secure Checkout",
-    totalAmount: Number(order.total_amount || 0), subtotal: Number(order.subtotal || order.total_amount || 0),
-    detergentFee: Number(order.detergent_fee || 0), deliveryFee: Number(order.delivery_fee || 0), discountAmount: Number(order.discount_amount || 0),
-    transactionId: order.stripe_payment_intent || undefined, customerName, customerEmail, customerPhone: order.customer_phone || "", address: fullAddress,
-    orderDetails: {
-      planName: order.pricing_mode === "per_bag" ? "By The Bag Wash & Fold (13 Gal)" : order.pricing_mode === "package" ? "Saver Package Credit" : "By The Pound (lb) Wash & Fold",
-      quantity: order.pricing_mode === "per_bag" ? `${order.bag_count || 1} Bag(s)` : `${order.final_weight_lbs || order.estimated_weight_lbs || 15} lbs`,
-      detergent: order.detergent_name || resolveDetergentName(order.detergent_id), specialRequest: order.is_out_of_home ? "Away — Contactless Doorstep Pickup" : "Home — Driver Rings Bell",
-    },
-  });
-
   const handleDownloadPdf = async () => {
+    if (!invoiceData) return;
     try {
-      setActionError(""); setIsPdfGenerating(true);
-      await downloadInvoiceAsPdf(getInvoiceData(), `LaundryExpress-Invoice-${order.order_number || orderId}.pdf`);
-    } catch (error) { setActionError(error instanceof Error ? error.message : "Unable to generate invoice PDF."); }
-    finally { setIsPdfGenerating(false); }
+      setActionError("");
+      setIsPdfGenerating(true);
+      await downloadInvoiceAsPdf(invoiceData, `LaundryExpress-Invoice-${order.order_number || orderId}.pdf`);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to generate invoice PDF.");
+    } finally {
+      setIsPdfGenerating(false);
+    }
   };
 
   const handleSendEmail = async () => {
     try {
-      setActionError(""); setIsSendingEmail(true);
+      setActionError("");
+      setIsSendingEmail(true);
       const res = await fetch("/api/orders/email-invoice", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: order.id, orderNumber: order.order_number || orderId, customerEmail: order.customer_email, customerName: order.customer_name, totalAmount: order.total_amount }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          orderNumber: order.order_number || orderId,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data?.success) throw new Error(data?.error || "Unable to send invoice email.");
-      setEmailSent(true); setTimeout(() => setEmailSent(false), 5000);
-    } catch (error) { setActionError(error instanceof Error ? error.message : "Unable to send invoice email."); }
-    finally { setIsSendingEmail(false); }
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 5000);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to send invoice email.");
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   return (
@@ -147,29 +164,40 @@ function SuccessContent() {
           {paid ? "Payment confirmed. Your pickup is scheduled and our courier will arrive on time." : "Order recorded. Awaiting payment confirmation."}
         </p>
       </div>
-      <OrderSummaryCard order={order} orderId={order.order_number || orderId} paid={paid} customerName={customerName} customerEmail={customerEmail} fullAddress={fullAddress} slotLabel={slotLabel} />
+
+      {invoiceData && (
+        <div className="w-full text-left">
+          <OrderInvoiceCard invoice={invoiceData} />
+        </div>
+      )}
+
       {paid && (
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={handleDownloadPdf} disabled={isPdfGenerating} className="w-full sm:w-auto cursor-pointer gap-2 border-primary/30 text-primary hover:bg-pink-50 font-bold">
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <Button type="button" variant="outline" onClick={handleDownloadPdf} disabled={isPdfGenerating} className="cursor-pointer gap-2 border-primary/30 text-primary hover:bg-pink-50 font-bold">
             {isPdfGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Download Invoice (PDF)
           </Button>
-          <Button type="button" variant="outline" onClick={handleSendEmail} disabled={isSendingEmail} className="w-full sm:w-auto cursor-pointer gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 font-bold">
+          <Button type="button" variant="outline" onClick={handleSendEmail} disabled={isSendingEmail} className="cursor-pointer gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 font-bold">
             {isSendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : emailSent ? <Check className="h-4 w-4 text-emerald-600" /> : <Mail className="h-4 w-4" />} {emailSent ? "Sent to Email!" : "Send to Email"}
           </Button>
-          <Link href="/dashboard/orders" className="w-full sm:w-auto">
-            <Button variant="hero" className="w-full sm:w-auto cursor-pointer gap-2"><span>Track in Dashboard</span><ArrowRight className="h-4 w-4" /></Button>
+          <Button type="button" variant="outline" onClick={() => window.print()} className="cursor-pointer gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 font-bold">
+            <Printer className="h-4 w-4" /> Print Invoice
+          </Button>
+          <Link href="/dashboard/orders">
+            <Button variant="hero" className="cursor-pointer gap-2"><span>Track in Dashboard</span><ArrowRight className="h-4 w-4" /></Button>
           </Link>
         </div>
       )}
+
       {!paid && (
         <Link href="/dashboard/orders" className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline">
           View pending order in dashboard <ArrowRight className="h-4 w-4" />
         </Link>
       )}
+
       {actionError && <p role="alert" className="text-xs text-rose-700">{actionError}</p>}
       {emailSent && paid && (
         <p className="text-xs text-emerald-600 font-semibold flex items-center justify-center gap-1">
-          <Check className="h-3.5 w-3.5" /> Official tax invoice PDF sent to {customerEmail || "your email"} and admin.
+          <Check className="h-3.5 w-3.5" /> Official tax invoice PDF sent to {order.customer_email || "your email"} and admin.
         </p>
       )}
       <div className="pt-2">

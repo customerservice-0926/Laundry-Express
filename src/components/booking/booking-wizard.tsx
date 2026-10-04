@@ -54,9 +54,9 @@ export function BookingWizard({
   const [promoCode, setPromoCode] = React.useState("");
   const [appliedCoupon, setAppliedCoupon] = React.useState<CouponItem>();
   const [promoError, setPromoError] = React.useState("");
-  const [paymentMethod, setPaymentMethod] = React.useState<"card" | "apple_pay" | "cash_on_delivery">("card");
+  const [paymentMethod, setPaymentMethod] = React.useState<"card" | "apple_pay">("card");
 
-  const { settings, rates, isLoading: isConfigLoading, error: configError } = useBookingConfig(initialPricing);
+  const { settings, rates, serverTime, isLoading: isConfigLoading, error: configError } = useBookingConfig(initialPricing);
   const { detergents, isLoading: isLoadingDetergents, error: detergentError } = useDetergents();
   const selectedDetergent = detergents.find((item) => item.id === selectedDetergentId);
   const { checkout, isProcessing, checkoutError } = useBookingCheckout();
@@ -88,9 +88,19 @@ export function BookingWizard({
 
   const isStep1Valid = pricingMode === "per_lb" ? (boundedWeightLbs >= rates.minLbs && boundedWeightLbs <= rates.maxLbs && !isNaN(boundedWeightLbs)) : pricingMode === "per_bag" && boundedBagCount >= rates.minBags && boundedBagCount <= rates.maxBags;
   const isStep2Valid = Boolean(selectedDetergentId);
-  const isDateValid = Boolean(selectedDate && selectedDate >= new Date().toISOString().split("T")[0]);
+  const todayStr = serverTime?.todayStr || new Date().toISOString().split("T")[0];
+  const nowHour = serverTime?.currentHour ?? new Date().getHours();
+  const isDateValid = Boolean(selectedDate && selectedDate >= todayStr);
   const isDropoffValid = !dropoffDate || dropoffDate >= selectedDate;
-  const isStep3Valid = isDateValid && isDropoffValid && Boolean(selectedSlot);
+
+  const slot1EndHour = parseInt(settings.slot1End?.split(":")[0] || "12", 10);
+  const slot2EndHour = parseInt(settings.slot2End?.split(":")[0] || "18", 10);
+  const isSelectedSlotClosed = selectedDate === todayStr && (
+    (selectedSlot === "8am-12pm" && nowHour >= slot1EndHour) ||
+    (selectedSlot === "1pm-6pm" && nowHour >= slot2EndHour)
+  );
+
+  const isStep3Valid = isDateValid && isDropoffValid && Boolean(selectedSlot) && !isSelectedSlotClosed;
   const isAddressValid = address.trim().length >= 5 && Boolean(addressDetails?.city.trim()) && /^[A-Z]{2}$/.test(addressDetails?.state.trim() || "") && /^\d{5}(-\d{4})?$/.test(addressDetails?.zip.trim() || "");
   const isStep4Valid = Boolean(isAddressValid && phoneValue.trim().length >= 7 && (!isOutOfHome || bagConfirmed));
 
@@ -138,8 +148,25 @@ export function BookingWizard({
             )}
             {step === 3 && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <StepSlotPicker selectedDate={selectedDate} onSelectDate={setSelectedDate} selectedSlot={selectedSlot} onSelectSlot={setSelectedSlot} dropoffDate={dropoffDate} onSelectDropoffDate={setDropoffDate} slot1Start={settings.slot1Start} slot1End={settings.slot1End} slot2Start={settings.slot2Start} slot2End={settings.slot2End} />
+                <StepSlotPicker
+                  selectedDate={selectedDate}
+                  onSelectDate={setSelectedDate}
+                  selectedSlot={selectedSlot}
+                  onSelectSlot={setSelectedSlot}
+                  dropoffDate={dropoffDate}
+                  onSelectDropoffDate={setDropoffDate}
+                  slot1Start={settings.slot1Start}
+                  slot1End={settings.slot1End}
+                  slot2Start={settings.slot2Start}
+                  slot2End={settings.slot2End}
+                  serverTime={serverTime}
+                />
                 {!isDropoffValid && <p className="text-xs text-rose-600 font-semibold px-1">Drop-off date cannot be before pickup date ({selectedDate}).</p>}
+                {isSelectedSlotClosed && (
+                  <p className="text-xs text-rose-600 font-semibold px-1">
+                    The {selectedSlot} pickup window for today is closed. Please select an available window or future date to proceed.
+                  </p>
+                )}
                 <div className="flex items-center justify-between pt-2">
                   <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
                   <Button variant="hero" size="lg" disabled={!isStep3Valid} onClick={() => isStep3Valid && setStep(4)}>Continue to Address <ArrowRight className="h-4 w-4 ml-2" /></Button>

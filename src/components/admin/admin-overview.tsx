@@ -65,7 +65,7 @@ export function AdminOverview({ orders, customers }: AdminOverviewProps) {
 
                   <div className="text-right shrink-0">
                     <span className="font-black text-slate-900 block">{formatCurrency(ord.total_amount)}</span>
-                    <span className="text-[10px] uppercase font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
+                    <span className="mt-1 inline-block text-[10px] uppercase font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
                       {ord.order_status.replace(/_/g, " ")}
                     </span>
                   </div>

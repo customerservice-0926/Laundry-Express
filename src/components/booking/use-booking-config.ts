@@ -31,8 +31,16 @@ const EMPTY_SETTINGS: BookingSettings = {
   deliveryZones: [],
 };
 
+export interface ServerTime {
+  todayStr: string;
+  currentHour: number;
+  currentMinute: number;
+  timeZone: string;
+}
+
 export function useBookingConfig(initialPricing?: Partial<PricingConfig>) {
   const [settings, setSettings] = React.useState(EMPTY_SETTINGS);
+  const [serverTime, setServerTime] = React.useState<ServerTime | null>(null);
   const [rates, setRates] = React.useState<BookingRates>({
     bagPrice: Number(initialPricing?.bag_price ?? 0),
     minBags: Number(initialPricing?.min_bags ?? 0),
@@ -60,6 +68,9 @@ export function useBookingConfig(initialPricing?: Partial<PricingConfig>) {
 
       const p = pricingData.pricing;
       const s = settingsData.settings;
+      if (settingsData.server_time) {
+        setServerTime(settingsData.server_time);
+      }
       const rawZones: string[] = Array.isArray(s.delivery_zones) ? s.delivery_zones : [];
       const deliveryZones = rawZones.map((item) => {
         const match = item.match(/^(.+?)\s*\(([0-9]{5})\)$/);
@@ -90,5 +101,5 @@ export function useBookingConfig(initialPricing?: Partial<PricingConfig>) {
     return () => { cancelled = true; };
   }, []);
 
-  return { settings, rates, isLoading, error };
+  return { settings, rates, serverTime, isLoading, error };
 }

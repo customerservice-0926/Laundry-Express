@@ -12,7 +12,7 @@ interface StepPaymentProps {
   onApplyPromo: () => void;
   promoError?: string;
   paymentMethod?: string;
-  onSelectPaymentMethod?: (m: "card" | "apple_pay" | "cash_on_delivery") => void;
+  onSelectPaymentMethod?: (m: "card" | "apple_pay") => void;
   isProcessing: boolean;
   onConfirm: () => void;
   onBack: () => void;

@@ -3,7 +3,7 @@ export interface GoogleMapProps {
   className?: string;
 }
 
-export function GoggleMap({
+export function GoogleMap({
   title = "Lake in the Hills & 30-Mile Service Area",
   className = "",
 }: GoogleMapProps) {
@@ -42,4 +42,5 @@ export function GoggleMap({
   );
 }
 
-export default GoggleMap;
+export const GoggleMap = GoogleMap;
+export default GoogleMap;

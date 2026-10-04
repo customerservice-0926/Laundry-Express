@@ -7,14 +7,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: NonNullable<MetadataRoute.Sitemap[number]["changeFrequency"]>;
     priority: number;
   }> = [
-    { path: "", changeFrequency: "weekly", priority: 1 },
+    { path: "", changeFrequency: "weekly", priority: 1.0 },
     { path: "/pricing", changeFrequency: "weekly", priority: 0.9 },
-    { path: "/contact", changeFrequency: "monthly", priority: 0.7 },
-    { path: "/terms", changeFrequency: "monthly", priority: 0.5 },
+    { path: "/order", changeFrequency: "weekly", priority: 0.85 },
+    { path: "/contact", changeFrequency: "monthly", priority: 0.75 },
+    { path: "/terms", changeFrequency: "monthly", priority: 0.6 },
   ];
 
+  const now = new Date();
   return routes.map(({ path, changeFrequency, priority }) => ({
     url: new URL(path, APP_CONFIG.url).toString(),
+    lastModified: now,
     changeFrequency,
     priority,
   }));

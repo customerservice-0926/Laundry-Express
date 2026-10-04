@@ -10,38 +10,25 @@ interface SettingsPasswordProps {
   userPhone?: string;
 }
 
-const STEP_KEY = "laundry_pwd_step";
-const TIME_KEY = "laundry_pwd_time";
-
-function isRecentVerifyStep(): boolean {
-  if (typeof window === "undefined") return false;
-  const saved = sessionStorage.getItem(STEP_KEY);
-  const time = Number(sessionStorage.getItem(TIME_KEY) || 0);
-  return saved === "verify" && Date.now() - time < 600_000;
-}
-
-function clearStepCache() {
-  if (typeof window !== "undefined") {
-    sessionStorage.removeItem(STEP_KEY);
-    sessionStorage.removeItem(TIME_KEY);
-  }
-}
-
 /**
  * SettingsPassword Component
  * Implements password change strictly via email OTP verification.
- * Automatically preserves the verify step across tab switching and page refreshes.
+ * State is strictly kept in-memory for security; credentials and OTPs never touch client storage.
  */
 export function SettingsPassword({ userEmail = "customer@laundryexpressservices.com" }: SettingsPasswordProps) {
   const { sendOtp, changePasswordWithOtp } = useAuth();
-  const [step, setStep] = React.useState<"request" | "verify" | "success">(() => isRecentVerifyStep() ? "verify" : "request");
+  const [step, setStep] = React.useState<"request" | "verify" | "success">("request");
   const [otpCode, setOtpCode] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState("");
-  const [infoMsg, setInfoMsg] = React.useState(() => isRecentVerifyStep() ? "A 6-digit verification code was dispatched to your email." : "");
+  const [infoMsg, setInfoMsg] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
+
+  const handleOtpChange = (val: string) => {
+    setOtpCode(val.replace(/\D/g, ""));
+  };
 
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -53,10 +40,6 @@ export function SettingsPassword({ userEmail = "customer@laundryexpressservices.
       const res = await sendOtp(userEmail, "change_password");
       if (res.success) {
         setStep("verify");
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem(STEP_KEY, "verify");
-          sessionStorage.setItem(TIME_KEY, String(Date.now()));
-        }
         setInfoMsg(`A 6-digit verification code has been dispatched to ${userEmail}.`);
       } else {
         setErrorMsg(res.error || "Failed to dispatch verification code.");
@@ -70,7 +53,6 @@ export function SettingsPassword({ userEmail = "customer@laundryexpressservices.
 
   const handleCancel = () => {
     setStep("request");
-    clearStepCache();
     setErrorMsg("");
     setInfoMsg("");
   };
@@ -97,7 +79,6 @@ export function SettingsPassword({ userEmail = "customer@laundryexpressservices.
       const res = await changePasswordWithOtp(userEmail, otpCode.trim(), newPassword);
       if (res.success) {
         setStep("success");
-        clearStepCache();
         setOtpCode("");
         setNewPassword("");
         setConfirmPassword("");
@@ -163,7 +144,7 @@ export function SettingsPassword({ userEmail = "customer@laundryexpressservices.
               maxLength={6}
               placeholder="e.g. 123456"
               value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+              onChange={(e) => handleOtpChange(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-base tracking-widest text-center focus:ring-2 focus:ring-primary"
             />
           </div>

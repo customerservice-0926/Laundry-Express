@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ContentService } from "@/lib/services/content-service";
 import { getVerifiedUser } from "@/lib/auth-request";
+import { getServiceNow } from "@/lib/services/booking-availability-service";
 
 const requireAdmin = async (req: NextRequest) => {
   const verified = await getVerifiedUser(req);
@@ -14,14 +15,20 @@ export async function GET(req: NextRequest) {
     const type = req.nextUrl.searchParams.get("type");
     if (type === "faqs") return NextResponse.json({ success: true, faqs: await ContentService.getFaqs() });
     if (type === "terms") return NextResponse.json({ success: true, terms: await ContentService.getTerms() });
-    if (type === "settings") return NextResponse.json({ success: true, settings: await ContentService.getSettings() });
+    if (type === "settings") {
+      return NextResponse.json({
+        success: true,
+        settings: await ContentService.getSettings(),
+        server_time: getServiceNow(),
+      });
+    }
 
     const [faqs, terms, settings] = await Promise.all([
       ContentService.getFaqs(),
       ContentService.getTerms(),
       ContentService.getSettings(),
     ]);
-    return NextResponse.json({ success: true, faqs, terms, settings });
+    return NextResponse.json({ success: true, faqs, terms, settings, server_time: getServiceNow() });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to load content";
     return NextResponse.json({ success: false, error: msg }, { status: 500 });

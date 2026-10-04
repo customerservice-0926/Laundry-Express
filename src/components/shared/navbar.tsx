@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, LogOut, LogIn, LayoutDashboard, Settings, ShoppingBag, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
+import { NavbarMobileDrawer } from "@/components/shared/navbar-mobile-drawer";
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -184,14 +185,15 @@ export function Navbar() {
 
           <div className="flex lg:hidden items-center gap-2">
             <Link href="/order">
-              <Button variant="hero" size="sm" className={scrolled ? "bg-white text-primary text-xs" : "text-xs"}>
+              <Button variant="hero" size="sm" className={scrolled ? "bg-white text-primary text-xs font-bold" : "text-xs font-bold shadow-sm"}>
                 Book
               </Button>
             </Link>
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className={`p-2 rounded-lg ${scrolled ? "text-white hover:bg-white/10" : "text-slate-800 hover:bg-slate-100"}`}
-              aria-label="Toggle Menu"
+              type="button"
+              onClick={() => setMobileMenuOpen((p) => !p)}
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${scrolled ? "text-white hover:bg-white/15" : "text-slate-800 hover:bg-slate-100"}`}
+              aria-label="Toggle Navigation Menu"
               aria-expanded={mobileMenuOpen}
               aria-controls="site-mobile-menu"
             >
@@ -201,38 +203,18 @@ export function Navbar() {
         </div>
       </div>
 
-      {mobileMenuOpen && (
-        <div id="site-mobile-menu" className={`lg:hidden px-5 pt-3 pb-6 space-y-3 ${scrolled ? "bg-primary text-white" : "bg-white text-slate-800 shadow-xl"}`}>
-          <div className="flex flex-col gap-2.5 font-semibold text-sm">
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} onClick={() => setMobileMenuOpen(false)} className={`py-1.5 ${scrolled ? "text-pink-100" : "text-slate-700"}`}>
-                {link.label}
-              </Link>
-            ))}
-            {mounted && isAuthenticated ? (
-              <>
-                <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="py-1.5 flex items-center gap-2 font-bold">
-                  <LayoutDashboard className="h-4 w-4" />
-                  <span>Dashboard</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => { setMobileMenuOpen(false); logout(); }}
-                  className="py-1.5 flex items-center gap-2 font-bold text-rose-500 text-left"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Sign Out</span>
-                </button>
-              </>
-            ) : (
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className={`py-1.5 flex items-center gap-1.5 font-bold ${scrolled ? "text-white" : "text-primary"}`}>
-                <LogIn className="h-4 w-4" />
-                <span>Sign In</span>
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
+      <NavbarMobileDrawer
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        pathname={pathname}
+        navLinks={navLinks}
+        isAuthenticated={mounted && isAuthenticated}
+        isAdmin={isAdmin}
+        userDisplayName={userDisplayName}
+        userAvatarUrl={userAvatarUrl}
+        userEmail={user?.email}
+        onLogout={logout}
+      />
     </header>
   );
 }

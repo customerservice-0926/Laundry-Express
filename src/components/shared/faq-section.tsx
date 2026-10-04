@@ -22,7 +22,7 @@ export function FaqSection() {
           setFaqList(data.faqs.map((f: { question: string; answer: string }) => ({ q: f.question, a: f.answer })));
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 

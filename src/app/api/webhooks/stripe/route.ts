@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { OrderService } from "@/lib/services/order-service";
 import { ContentService } from "@/lib/services/content-service";
-import { sendInvoiceEmail } from "@/lib/services/email-service";
-import { formatSlotLabel, resolveDetergentName } from "@/lib/utils";
+import { sendInvoiceEmail, type InvoiceEmailPayload } from "@/lib/services/email-service";
+import { orderToUnifiedInvoice } from "@/lib/invoice/invoice-utils";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 export async function POST(req: NextRequest) {
@@ -134,61 +134,24 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   // 2. Generate and dispatch official invoice email to customer and admin
   try {
-    const planNames: Record<string, string> = {
-      per_bag: "By The Bag (13 Gal)",
-      per_lb: "By The Pound (lb)",
-      package: "Saver Package",
-    };
+    const settings = await ContentService.getSettings();
+    const invoicePayload = orderToUnifiedInvoice(finalOrder, {
+      slotTimes: settings
+        ? { s1: settings.slot1_start, e1: settings.slot1_end, s2: settings.slot2_start, e2: settings.slot2_end }
+        : undefined,
+      customerName: session.customer_details?.name || finalOrder.customer_name,
+      customerEmail: session.customer_details?.email || finalOrder.customer_email,
+      transactionId:
+        (typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id) ||
+        finalOrder.stripe_payment_intent ||
+        undefined,
+    });
 
-    const fullAddress = [
-      finalOrder.street_address,
-      finalOrder.apt_unit ? `Apt ${finalOrder.apt_unit}` : "",
-      finalOrder.city,
-      finalOrder.state,
-      finalOrder.zip_code,
-    ].filter(Boolean).join(", ") || finalOrder.pickup_address || "Doorstep Address";
-
-    const customerEmail = session.customer_details?.email || finalOrder.customer_email;
-    if (!customerEmail) {
+    if (!invoicePayload.customerEmail) {
       throw new Error(`No customer email is available for paid order ${identifier}.`);
     }
 
-    const settings = await ContentService.getSettings();
-    const slotLabel = settings?.slot1_start && settings.slot1_end && settings.slot2_start && settings.slot2_end &&
-      (finalOrder.pickup_slot === "8am-12pm" || finalOrder.pickup_slot === "1pm-6pm")
-      ? formatSlotLabel(
-          finalOrder.pickup_slot as "8am-12pm" | "1pm-6pm",
-          settings.slot1_start || "", settings.slot1_end || "",
-          settings.slot2_start || "", settings.slot2_end || ""
-        )
-      : finalOrder.pickup_slot || "Scheduled Window";
-
-    await sendInvoiceEmail({
-      orderNumber: finalOrder.order_number,
-      orderDate: finalOrder.created_at,
-      paymentMethod: "Credit / Debit Card (Stripe)",
-      customerName: session.customer_details?.name || finalOrder.customer_name || "Valued Customer",
-      customerEmail,
-      pickupDate: finalOrder.pickup_date,
-      pickupSlot: slotLabel,
-      deliveryDate: finalOrder.delivery_date || "Within 24 Hours",
-      planName: planNames[finalOrder.pricing_mode] || finalOrder.pricing_mode,
-      quantity: finalOrder.pricing_mode === "per_bag"
-        ? `${finalOrder.bag_count} Bag(s)`
-        : `${finalOrder.final_weight_lbs || finalOrder.estimated_weight_lbs || 0} lbs`,
-      detergent: finalOrder.detergent_name || resolveDetergentName(finalOrder.detergent_id),
-      detergentFee: Number(finalOrder.detergent_fee || 0),
-      subtotal: Number(finalOrder.subtotal || 0),
-      deliveryFee: Number(finalOrder.delivery_fee || 0),
-      discountAmount: Number(finalOrder.discount_amount || 0),
-      totalAmount: Number(finalOrder.total_amount || 0),
-      address: fullAddress,
-      customerPhone: finalOrder.customer_phone || undefined,
-      specialRequest: finalOrder.customer_notes || undefined,
-      transactionId: finalOrder.stripe_payment_intent || (typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id) || undefined,
-      orderCancelled: finalOrder.order_status === "cancelled",
-    });
-
+    await sendInvoiceEmail(invoicePayload as unknown as InvoiceEmailPayload);
     await OrderService.markInvoiceEmailSent(finalOrder.id);
     console.info(`[stripe-webhook] Payment captured and invoice emailed for order ${finalOrder.order_number}`);
   } catch (emailErr: unknown) {

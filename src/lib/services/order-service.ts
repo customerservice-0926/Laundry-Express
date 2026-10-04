@@ -191,8 +191,8 @@ export class OrderService {
     if (!ORDER_TRANSITIONS[order.order_status].includes(status)) {
       throw new Error(`Order cannot move from ${order.order_status} to ${status}.`);
     }
-    if (order.order_status === "pending" && status === "driver_assigned" && order.payment_method !== "cash_on_delivery") {
-      throw new Error("Card orders must be confirmed by the payment webhook before dispatch.");
+    if (order.order_status === "pending" && status === "driver_assigned") {
+      throw new Error("Orders must be confirmed by payment before dispatch.");
     }
     const supabase = createAdminSupabaseClient();
     const column = UUID_PATTERN.test(orderId) ? "id" : "order_number";

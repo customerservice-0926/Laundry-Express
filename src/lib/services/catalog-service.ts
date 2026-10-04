@@ -15,21 +15,25 @@ const isUuid = (val?: string): boolean =>
 
 export class CatalogService {
   static async getCatalog(): Promise<{ detergents: DetergentItem[] }> {
-    const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase.from("catalog_items").select("*")
-      .eq("category", "detergent").order("created_at", { ascending: true });
-    if (error) throw new Error(`Unable to load detergents: ${error.message}`);
-    return {
-      detergents: (data ?? []).map((item) => ({
-        id: item.id,
-        name: item.name,
-        type: item.item_type as DetergentItem["type"],
-        brand: item.brand || "",
-        price: Number(item.price ?? 0),
-        description: item.description || "",
-        is_active: item.is_active ?? true,
-      })),
-    };
+    try {
+      const supabase = createAdminSupabaseClient();
+      const { data, error } = await supabase.from("catalog_items").select("*")
+        .eq("category", "detergent").order("created_at", { ascending: true });
+      if (error || !data) return { detergents: [] };
+      return {
+        detergents: data.map((item) => ({
+          id: item.id,
+          name: item.name,
+          type: item.item_type as DetergentItem["type"],
+          brand: item.brand || "",
+          price: Number(item.price ?? 0),
+          description: item.description || "",
+          is_active: item.is_active ?? true,
+        })),
+      };
+    } catch {
+      return { detergents: [] };
+    }
   }
 
   static async saveDetergent(item: Partial<DetergentItem>): Promise<DetergentItem> {

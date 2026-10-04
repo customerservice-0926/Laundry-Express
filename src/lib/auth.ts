@@ -104,27 +104,43 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: false,
       async profile(profile) {
         const normalizedEmail = profile.email?.trim().toLowerCase() || "";
+        let role: "admin" | "customer" = "customer";
+        let dbUserId = profile.sub;
+        let dbFullName = profile.name || "Google Customer";
+        let dbPhone: string | undefined;
 
-        // Dynamically query user from database to preserve admin privileges
-        const existing = await UserDbService.getUserByEmail(normalizedEmail);
-        const role = existing?.role || "customer";
-
-        // Persist Google authenticated user into Supabase database
-        const dbUser = await UserDbService.syncUser({
-          id: profile.sub,
-          email: normalizedEmail,
-          name: profile.name || "Google Customer",
-          role,
-          image: profile.picture,
-        });
+        try {
+          const existing = await UserDbService.getUserByEmail(normalizedEmail);
+          if (existing) {
+            role = existing.role || "customer";
+            dbUserId = existing.id;
+            dbFullName = existing.full_name || dbFullName;
+            dbPhone = existing.phone || undefined;
+          }
+          const dbUser = await UserDbService.syncUser({
+            id: profile.sub,
+            email: normalizedEmail,
+            name: dbFullName,
+            role,
+            image: profile.picture,
+          });
+          if (dbUser) {
+            dbUserId = dbUser.id || dbUserId;
+            dbFullName = dbUser.full_name || dbFullName;
+            role = dbUser.role || role;
+            dbPhone = dbUser.phone || dbPhone;
+          }
+        } catch (err) {
+          console.error("Google profile sync error:", err);
+        }
 
         return {
-          id: dbUser.id,
-          name: dbUser.full_name,
-          email: dbUser.email,
-          image: profile.picture || dbUser.avatar_url || null,
-          role: dbUser.role,
-          phone: dbUser.phone,
+          id: dbUserId,
+          name: dbFullName,
+          email: normalizedEmail,
+          image: profile.picture || null,
+          role,
+          phone: dbPhone,
         };
       },
     }),
@@ -132,16 +148,22 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user }) {
       if (user?.email) {
-        const synchronized = await UserDbService.syncUser({
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          phone: user.phone,
-          avatar_url: user.image || undefined,
-        });
-        user.id = synchronized.id;
-        user.role = synchronized.role;
-        user.phone = synchronized.phone;
+        try {
+          const synchronized = await UserDbService.syncUser({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            phone: user.phone,
+            avatar_url: user.image || undefined,
+          });
+          if (synchronized) {
+            user.id = synchronized.id;
+            user.role = synchronized.role;
+            user.phone = synchronized.phone || undefined;
+          }
+        } catch (err) {
+          console.error("signIn callback sync error:", err);
+        }
       }
       return true;
     },
@@ -151,33 +173,47 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role || "customer";
         token.phone = user.phone;
         token.picture = user.image || token.picture;
+        token.email = user.email || token.email;
+        token.name = user.name || token.name;
       }
-      if (token.id) {
-        const activeUser = await UserDbService.getActiveUserById(token.id);
-        if (!activeUser) {
-          token.id = "";
-          token.role = "customer";
-          token.email = undefined;
-        } else {
-          token.id = activeUser.id;
-          token.role = activeUser.role;
-          token.email = activeUser.email;
-          token.name = activeUser.full_name;
-          token.phone = activeUser.phone;
-          token.picture = activeUser.avatar_url || token.picture;
+
+      if (!token.id && token.sub) {
+        token.id = token.sub;
+      }
+
+      if (token.id || token.email) {
+        try {
+          let activeUser = token.id ? await UserDbService.getActiveUserById(String(token.id)) : null;
+          if (!activeUser && token.email) {
+            activeUser = await UserDbService.getUserByEmail(String(token.email));
+          }
+          if (activeUser) {
+            token.id = activeUser.id;
+            token.role = activeUser.role;
+            token.email = activeUser.email;
+            token.name = activeUser.full_name;
+            token.phone = activeUser.phone || undefined;
+            token.picture = activeUser.avatar_url || token.picture;
+          }
+        } catch (err) {
+          console.error("JWT user refresh error:", err);
         }
       }
+
       if (trigger === "update" && session) {
         if (session.image) token.picture = session.image;
         if (session.avatar_url) token.picture = session.avatar_url;
+        if (session.name) token.name = session.name;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id;
+        session.user.id = (token.id as string) || (token.sub as string) || "";
         session.user.role = (token.role as "admin" | "customer") || "customer";
         session.user.phone = token.phone;
+        session.user.email = (token.email as string) || session.user.email || "";
+        session.user.name = (token.name as string) || session.user.name || "Customer";
         session.user.image = (token.picture as string) || session.user.image || null;
       }
       return session;
