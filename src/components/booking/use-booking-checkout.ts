@@ -23,7 +23,7 @@ export interface CheckoutPayload {
   notes: string;
   priceResult: { subtotal: number; detergent_fee: number; delivery_fee: number; discount_amount: number; total_amount: number };
   coupon?: CouponItem;
-  paymentMethod: "card" | "apple_pay" | "cash_on_delivery";
+  paymentMethod: "card" | "apple_pay";
 }
 
 export function useBookingCheckout() {

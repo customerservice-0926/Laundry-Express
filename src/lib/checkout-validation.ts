@@ -1,4 +1,4 @@
-const PAYMENT_METHODS = ["card", "apple_pay", "stripe", "cash_on_delivery"];
+const PAYMENT_METHODS = ["card", "apple_pay", "stripe"];
 const PICKUP_SLOTS = ["8am-12pm", "1pm-6pm"];
 
 export function validateCheckoutPayload(input: unknown): string | null {

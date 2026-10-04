@@ -87,7 +87,7 @@ export function CouponsManager() {
             <label className="font-bold text-slate-700 block mb-1">Discount Type</label>
             <select value={discountType} onChange={(e) => setDiscountType(e.target.value as CouponItem["discount_type"])} className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white">
               <option value="percentage">Percentage (%)</option>
-              <option value="fixed_amount">Fixed Cash ($)</option>
+              <option value="fixed_amount">Fixed Amount ($)</option>
               <option value="free_delivery">Free Delivery (100%)</option>
             </select>
           </div>

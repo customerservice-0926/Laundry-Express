@@ -118,21 +118,6 @@ export function OrderTableRow({
           </Button>
         )}
 
-        {order.order_status === "pending" && order.payment_method === "cash_on_delivery" && (
-          <Button
-            variant="hero"
-            size="sm"
-            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateStatus(order.id, "driver_assigned");
-            }}
-          >
-            <Send className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Accept Order
-          </Button>
-        )}
-
         {order.order_status === "driver_assigned" && (
           <Button
             variant="primary"

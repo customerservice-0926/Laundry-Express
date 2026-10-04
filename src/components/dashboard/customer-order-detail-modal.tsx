@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, formatSlotLabel, resolveDetergentName } from "@/lib/utils";
 import { downloadInvoiceAsPdf } from "@/lib/invoice/pdf-invoice-generator";
+import { orderToInvoiceData } from "@/lib/invoice/invoice-utils";
 import type { InvoiceData } from "@/components/booking/order-invoice-modal";
 import type { Order } from "@/types";
 
@@ -40,17 +41,7 @@ export function CustomerOrderDetailModal({ order, isOpen, onClose }: CustomerOrd
     try {
       setPdfError("");
       setIsPdfGenerating(true);
-      const inv: InvoiceData = {
-        orderId: order.order_number,
-        orderDate: order.created_at ? new Date(order.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-        pickupDate: order.pickup_date, pickupSlot: slotLabel, deliveryDate: order.delivery_date || "Within 24 Hours",
-        paymentMethod: order.payment_method === "card" ? "Credit / Debit Card (Stripe)" : "Stripe Secure Checkout",
-        totalAmount: Number(order.total_amount || 0), subtotal: Number(order.subtotal || order.total_amount || 0),
-        detergentFee: Number(order.detergent_fee || 0), deliveryFee: Number(order.delivery_fee || 0), discountAmount: Number(order.discount_amount || 0),
-        transactionId: order.stripe_payment_intent || undefined,
-        customerName: order.customer_name || "Valued Customer", customerEmail: order.customer_email || "", customerPhone: order.customer_phone || "", address: fullAddress,
-        orderDetails: { planName: planLabel, quantity: quantityLabel, detergent: order.detergent_name || resolveDetergentName(order.detergent_id), specialRequest: order.is_out_of_home ? "Away — Contactless Doorstep Pickup" : "Home — Driver Rings Bell" },
-      };
+      const inv = orderToInvoiceData(order, slotTimes);
       await downloadInvoiceAsPdf(inv, `LaundryExpress-Invoice-${order.order_number}.pdf`);
     } catch {
       setPdfError("Unable to generate the invoice PDF. Please try again.");

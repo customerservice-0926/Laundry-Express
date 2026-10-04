@@ -41,7 +41,6 @@ function escapeHtml(value?: string): string {
 const methodLabel: Record<string, string> = {
   card: "Credit / Debit Card (Stripe)",
   apple_pay: "Apple Pay (Stripe)",
-  cash_on_delivery: "Cash on Delivery",
   stripe: "Stripe 256-bit Secure Checkout",
 };
 

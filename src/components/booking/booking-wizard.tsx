@@ -54,7 +54,7 @@ export function BookingWizard({
   const [promoCode, setPromoCode] = React.useState("");
   const [appliedCoupon, setAppliedCoupon] = React.useState<CouponItem>();
   const [promoError, setPromoError] = React.useState("");
-  const [paymentMethod, setPaymentMethod] = React.useState<"card" | "apple_pay" | "cash_on_delivery">("card");
+  const [paymentMethod, setPaymentMethod] = React.useState<"card" | "apple_pay">("card");
 
   const { settings, rates, serverTime, isLoading: isConfigLoading, error: configError } = useBookingConfig(initialPricing);
   const { detergents, isLoading: isLoadingDetergents, error: detergentError } = useDetergents();

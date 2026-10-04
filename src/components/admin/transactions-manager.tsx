@@ -28,9 +28,9 @@ export function TransactionsManager({ orders }: TransactionsManagerProps) {
         : o.payment_status === "refunded" ? "refunded"
           : o.payment_status === "failed" ? "failed" : "pending",
       date: o.created_at || new Date().toISOString(),
-      method: o.payment_method === "card" ? "Credit Card" : o.payment_method === "apple_pay" ? "Apple Pay" : o.payment_method === "google_pay" ? "Google Pay" : "Doorstep Cash/Card",
+      method: o.payment_method === "card" ? "Credit Card" : o.payment_method === "apple_pay" ? "Apple Pay" : o.payment_method === "google_pay" ? "Google Pay" : "Stripe Secured",
       card_last4: o.payment_method === "card" ? "Card" : "",
-      stripe_payment_intent: o.stripe_payment_intent || "Direct/Cash",
+      stripe_payment_intent: o.stripe_payment_intent || "Stripe Secured",
     }));
   }, [orders]);
 
