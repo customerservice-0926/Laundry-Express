@@ -1,17 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { CreditCard, Search, Filter, DollarSign, TrendingUp, AlertCircle, ExternalLink, Calendar, ChevronDown } from "lucide-react";
+import { CreditCard, Search, Filter, DollarSign, TrendingUp, AlertCircle, Calendar, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import type { Order, AdminPaymentTransaction } from "@/types";
 
 interface TransactionsManagerProps {
   orders?: Order[];
-  onViewOrder?: (orderId: string) => void;
 }
 
-export function TransactionsManager({ orders, onViewOrder }: TransactionsManagerProps) {
+export function TransactionsManager({ orders }: TransactionsManagerProps) {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [dateRange, setDateRange] = React.useState<"all" | "today" | "week" | "month" | "year">("month");
@@ -183,13 +182,9 @@ export function TransactionsManager({ orders, onViewOrder }: TransactionsManager
                   <p className="text-xs text-slate-500">{txn.customer_email}</p>
                 </td>
                 <td className="py-3.5 px-4">
-                  <button
-                    onClick={() => onViewOrder && onViewOrder(txn.order_id)}
-                    className="font-mono text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                  >
+                  <span className="font-mono text-xs font-bold text-slate-900">
                     {txn.order_number}
-                    <ExternalLink className="h-3 w-3" />
-                  </button>
+                  </span>
                 </td>
                 <td className="py-3.5 px-4 text-xs font-semibold text-slate-700">
                   <span className="flex items-center gap-1.5">
