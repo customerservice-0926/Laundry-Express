@@ -97,6 +97,7 @@ export interface Order {
   user_id: string;
   pricing_mode: PricingMode;
   package_id?: string | null;
+  package_name?: string | null;
   detergent_id: string;
   detergent_name?: string;
   bag_count: number;

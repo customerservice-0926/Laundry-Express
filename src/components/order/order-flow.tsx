@@ -17,7 +17,7 @@ export function OrderFlow({ initialPricing }: OrderFlowProps) {
 
   const packageParam = searchParams.get("package");
   const modeParam = searchParams.get("mode") as PricingMode | null;
-  const initialMode: PricingMode = modeParam === "per_lb" ? "per_lb" : "per_bag";
+  const initialMode: PricingMode = modeParam === "per_lb" || modeParam === "package" ? modeParam : "per_bag";
 
   const bagsParam = searchParams.get("bags");
   const minBags = initialPricing?.min_bags ?? 1;
@@ -27,7 +27,7 @@ export function OrderFlow({ initialPricing }: OrderFlowProps) {
   const weightParam = searchParams.get("lbs") || searchParams.get("weight");
   const initialWeightLbs = weightParam ? Math.max(minLbs, parseFloat(weightParam) || minLbs) : minLbs;
 
-  const initialPackageId = packageParam || "pkg-saver-5";
+  const initialPackageId = packageParam ?? undefined;
 
   if (isLoading || !isAuthenticated || !user) {
     return (

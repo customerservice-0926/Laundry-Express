@@ -66,6 +66,7 @@ export class OrderService {
       customer_email: payload.customer_email?.trim().toLowerCase() || "",
       customer_phone: payload.customer_phone?.trim() || "",
       plan_type: payload.pricing_mode || "per_bag", bag_count: payload.bag_count ?? 1,
+      package_id: payload.package_id || null, package_name: payload.package_name || null,
       estimated_weight_lbs: payload.estimated_weight_lbs ?? 0, weight_lbs: payload.estimated_weight_lbs ?? 0,
       detergent_id: payload.detergent_id, detergent_name: payload.detergent_name || "",
       detergent_fee: payload.detergent_fee ?? 0, pickup_date: payload.pickup_date,
@@ -94,6 +95,7 @@ export class OrderService {
       throw new Error(`Unable to save order: ${error?.message || "No order returned."}`);
     }
     const order = mapOrderRecord(record);
+    if (!order.package_name && payload.package_name) order.package_name = payload.package_name;
     void broadcastOrderEvent({
       eventType: "order_created", orderId: order.id, orderNumber: order.order_number,
       orderStatus: order.order_status, paymentStatus: order.payment_status,

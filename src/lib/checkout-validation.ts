@@ -6,8 +6,11 @@ export function validateCheckoutPayload(input: unknown): string | null {
     return "A JSON object is required.";
   }
   const body = input as Record<string, unknown>;
-  if (body.pricing_mode !== "per_bag" && body.pricing_mode !== "per_lb") {
+  if (body.pricing_mode !== "per_bag" && body.pricing_mode !== "per_lb" && body.pricing_mode !== "package") {
     return "Choose an available laundry pricing plan.";
+  }
+  if (body.pricing_mode === "package" && (typeof body.package_id !== "string" || !body.package_id)) {
+    return "Choose an available package.";
   }
   if (
     typeof body.pickup_date !== "string" ||

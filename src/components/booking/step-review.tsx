@@ -27,6 +27,9 @@ interface StepReviewProps {
   slot1End: string;
   slot2Start: string;
   slot2End: string;
+  packageName?: string;
+  packageCapacity?: number;
+  packageUnit?: "bag" | "lb";
   onEditStep: (step: number) => void;
   onBack: () => void;
   onContinue: () => void;
@@ -36,6 +39,9 @@ export function StepReview({
   pricingMode,
   bagCount,
   weightLbs,
+  packageName,
+  packageCapacity,
+  packageUnit,
   selectedDetergentId,
   selectedDate,
   selectedSlot,
@@ -57,7 +63,8 @@ export function StepReview({
   const getPlanDescription = () => {
     if (pricingMode === "per_bag") return `${bagCount} Standard 13-Gal Bag${bagCount > 1 ? "s" : ""}`;
     if (pricingMode === "per_lb") return `${weightLbs} lbs Weighed Volume`;
-    return "Pre-Paid Package Credit";
+    if (packageName) return `${packageName} (${packageCapacity || 0} ${packageUnit === "lb" ? "lbs" : "bags"} included)`;
+    return "Wash & Fold Package Plan";
   };
 
   const getSlotLabel = () => {
