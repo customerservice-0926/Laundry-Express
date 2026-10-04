@@ -92,7 +92,7 @@ export function OrderInvoiceCard({ invoice, className = "" }: OrderInvoiceCardPr
             {invoice.orderCancelled ? "PAID — ORDER CANCELLED" : "PAID & CONFIRMED"}
           </span>
           <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider">
-            TAX INVOICE &bull; {orderId}
+            {invoice.orderCancelled ? "CANCELLATION INVOICE" : "TAX INVOICE"} &bull; {orderId}
           </p>
         </div>
       </div>
@@ -232,7 +232,7 @@ export function OrderInvoiceCard({ invoice, className = "" }: OrderInvoiceCardPr
             Questions? Contact support at <strong>{APP_CONFIG.supportPhone}</strong> or email <strong>{APP_CONFIG.supportEmail}</strong>
           </p>
           <p className="text-[10px] text-slate-400">
-            Official Computer-Generated Tax Invoice &bull; Laundry Express &bull; laundryexpressservices.com
+            {invoice.orderCancelled ? "Official Order Cancellation Receipt & Settlement" : "Official Computer-Generated Tax Invoice"} &bull; Laundry Express &bull; laundryexpressservices.com
           </p>
         </div>
       </div>

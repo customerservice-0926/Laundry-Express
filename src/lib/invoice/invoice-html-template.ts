@@ -110,7 +110,7 @@ export function generateInvoiceHtml(inv: UnifiedInvoiceInput): string {
               ✓ ${statusText}
             </span>
             <p style="margin:6px 0 0;color:#94a3b8;font-size:10px;font-family:monospace;font-weight:700;text-transform:uppercase">
-              TAX INVOICE &bull; ${orderId}
+              ${inv.orderCancelled ? "CANCELLATION INVOICE" : "TAX INVOICE"} &bull; ${orderId}
             </p>
           </td>
         </tr>
@@ -234,7 +234,7 @@ export function generateInvoiceHtml(inv: UnifiedInvoiceInput): string {
             Questions? Contact support at <strong>${escapeHtml(APP_CONFIG.supportPhone)}</strong> or reply to <strong>${escapeHtml(APP_CONFIG.supportEmail)}</strong>
           </p>
           <p style="color:#94a3b8;font-size:10px;margin:0">
-            Official Computer-Generated Tax Invoice &middot; Laundry Express &middot; laundryexpressservices.com
+            ${inv.orderCancelled ? "Official Order Cancellation Receipt & Settlement" : "Official Computer-Generated Tax Invoice"} &middot; Laundry Express &middot; laundryexpressservices.com
           </p>
         </div>
       </div>
