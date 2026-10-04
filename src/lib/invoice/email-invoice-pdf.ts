@@ -83,13 +83,13 @@ export function createEmailInvoicePdf(invoice: InvoiceEmailPayload): Buffer {
   pdf.setFontSize(7.5);
   pdf.setTextColor(190, 24, 93);
   pdf.setFont("helvetica", "bold");
-  pdf.text("LOGISTICS & SCHEDULE TIMELINE", c2X + 4, y + 5.5);
+  pdf.text("SCHEDULE & REFERENCE", c2X + 4, y + 5.5);
   pdf.setFontSize(7.5);
   pdf.setTextColor(100, 116, 139);
-  pdf.text("Invoice No:", c2X + 4, y + 10.5);
-  pdf.text("Order Date:", c2X + 4, y + 15);
+  pdf.text("Order Number:", c2X + 4, y + 10.5);
+  pdf.text("Order Placed:", c2X + 4, y + 15);
   pdf.text("Pickup Window:", c2X + 4, y + 19.5);
-  pdf.text("Est. Delivery:", c2X + 4, y + 24);
+  pdf.text("Estimated Return:", c2X + 4, y + 24);
   pdf.text("Stripe Tx ID:", c2X + 4, y + 28.5);
 
   pdf.setFont("helvetica", "bold");
@@ -111,7 +111,7 @@ export function createEmailInvoicePdf(invoice: InvoiceEmailPayload): Buffer {
   pdf.setFontSize(7.5);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(255, 255, 255);
-  pdf.text("SERVICE / ORDER DESCRIPTION", margin + 4, y + 4.8);
+  pdf.text("SERVICE BREAKDOWN", margin + 4, y + 4.8);
   pdf.text("SPECIFICATION & CARE", margin + 70, y + 4.8);
   pdf.text("QTY", margin + 130, y + 4.8);
   pdf.text("AMOUNT", W - margin - 4, y + 4.8, { align: "right" });
@@ -120,8 +120,8 @@ export function createEmailInvoicePdf(invoice: InvoiceEmailPayload): Buffer {
   y += 7;
   const rows = [
     [planName, `${detergent} • Gentle Cold Wash`, quantity, `$${subtotal.toFixed(2)}`],
-    [`Detergent Formulation (${detergent})`, "Standard Cold Eco-Wash Formula", "1 Cycle", detFeeStr],
-    ["Doorstep Pickup & 24hr Return Delivery", invoice.specialRequest || "Contactless Delivery", "1 Trip", deliveryFee === 0 ? "FREE" : `$${deliveryFee.toFixed(2)}`],
+    [`Detergent Formulation Fee (${detergent})`, "Standard Cold Eco-Wash Formula", "1 Cycle", detFeeStr],
+    ["Doorstep Logistics (Pickup & Return)", invoice.specialRequest || "Contactless Delivery", "1 Trip", deliveryFee === 0 ? "FREE ($0.00)" : `$${deliveryFee.toFixed(2)}`],
   ];
   if (discountAmount > 0) {
     rows.push(["Promotional Coupon Discount", "Verified discount applied", "1 Promo", `-$${discountAmount.toFixed(2)}`]);
@@ -175,17 +175,20 @@ export function createEmailInvoicePdf(invoice: InvoiceEmailPayload): Buffer {
   pdf.setDrawColor(226, 232, 240);
   pdf.roundedRect(tX, y, cardW, bCardH, 3, 3, "FD");
   pdf.setFontSize(7.5);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(190, 24, 93);
+  pdf.text("FINANCIAL SETTLEMENT", tX + 4, y + 5.5);
   pdf.setFont("helvetica", "normal");
   pdf.setTextColor(100, 116, 139);
-  pdf.text("Service Subtotal:", tX + 4, y + 6);
-  pdf.text("Detergent Formulation:", tX + 4, y + 11);
-  pdf.text("Doorstep Logistics:", tX + 4, y + 16);
+  pdf.text("Service Subtotal:", tX + 4, y + 10.5);
+  pdf.text("Detergent Formulation:", tX + 4, y + 15);
+  pdf.text("Doorstep Logistics:", tX + 4, y + 19.5);
   pdf.setTextColor(15, 23, 42);
-  pdf.text(`$${subtotal.toFixed(2)}`, tX + cardW - 4, y + 6, { align: "right" });
-  pdf.text(detFeeStr, tX + cardW - 4, y + 11, { align: "right" });
-  pdf.text(deliveryFee === 0 ? "FREE" : `$${deliveryFee.toFixed(2)}`, tX + cardW - 4, y + 16, { align: "right" });
+  pdf.text(`$${subtotal.toFixed(2)}`, tX + cardW - 4, y + 10.5, { align: "right" });
+  pdf.text(detFeeStr, tX + cardW - 4, y + 15, { align: "right" });
+  pdf.text(deliveryFee === 0 ? "FREE ($0.00)" : `$${deliveryFee.toFixed(2)}`, tX + cardW - 4, y + 19.5, { align: "right" });
 
-  let curY = y + 21;
+  let curY = y + 24;
   if (discountAmount > 0) {
     pdf.setTextColor(4, 120, 87);
     pdf.text("Promo Discount:", tX + 4, curY);
@@ -195,12 +198,12 @@ export function createEmailInvoicePdf(invoice: InvoiceEmailPayload): Buffer {
   pdf.setDrawColor(203, 213, 225);
   pdf.line(tX + 4, curY - 1, tX + cardW - 4, curY - 1);
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(9);
+  pdf.setFontSize(8);
   pdf.setTextColor(15, 23, 42);
-  pdf.text("TOTAL CLEARED:", tX + 4, curY + 4.5);
-  pdf.setFontSize(12);
+  pdf.text("TOTAL CLEARED & AUTHORIZED:", tX + 4, curY + 4);
+  pdf.setFontSize(11);
   pdf.setTextColor(190, 24, 93);
-  pdf.text(`$${totalAmount.toFixed(2)}`, tX + cardW - 4, curY + 4.5, { align: "right" });
+  pdf.text(`$${totalAmount.toFixed(2)}`, tX + cardW - 4, curY + 4, { align: "right" });
 
   // Satisfaction Guarantee Banner
   y += bCardH + 5;

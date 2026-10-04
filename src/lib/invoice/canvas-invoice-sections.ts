@@ -137,7 +137,7 @@ export function drawPortraitMetaAndCards(
 
   ctx.fillStyle = "#BE185D";
   ctx.font = "bold 11px -apple-system, BlinkMacSystemFont, sans-serif";
-  ctx.fillText("CUSTOMER & BILLING DETAILS", 70, cardY + 28);
+  ctx.fillText("BILLED TO CUSTOMER", 70, cardY + 28);
 
   ctx.fillStyle = "#0F172A";
   ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, sans-serif";
@@ -165,13 +165,13 @@ export function drawPortraitMetaAndCards(
 
   ctx.fillStyle = "#BE185D";
   ctx.font = "bold 11px -apple-system, BlinkMacSystemFont, sans-serif";
-  ctx.fillText("LOGISTICS & SCHEDULE TIMELINE", c2X + 20, cardY + 28);
+  ctx.fillText("SCHEDULE & REFERENCE", c2X + 20, cardY + 28);
 
   const metaRows = [
-    ["Invoice No:", inv.orderId],
+    ["Order Number:", inv.orderId],
     ["Order Date:", inv.orderDate],
     ["Pickup Window:", `${inv.pickupDate} (${inv.pickupSlot})`],
-    ["Est. Delivery:", `${inv.deliveryDate} (24-Hour Return)`],
+    ["Estimated Return:", `${inv.deliveryDate} (24hr Return)`],
     ["Doorstep Protocol:", inv.orderDetails.specialRequest || "Contactless Delivery"],
   ];
 
