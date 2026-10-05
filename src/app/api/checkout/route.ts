@@ -107,7 +107,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Checkout requires a secure site URL." }, { status: 503 });
     }
     const origin = originUrl.origin;
-    if (Math.round(serverPrice.total_amount * 100) < 50) return NextResponse.json({ success: false, error: "The order total is below Stripe's minimum payment amount." }, { status: 400 });
+    // Here need to update
+    if (Math.round(serverPrice.total_amount * 100) < 0) return NextResponse.json({ success: false, error: "The order total is below Stripe's minimum payment amount." }, { status: 400 });
 
     const createdOrder = await OrderService.createOrder({
       ...body,
@@ -173,11 +174,11 @@ export async function POST(req: NextRequest) {
     try {
       await OrderService.saveCheckoutSessionId(createdOrder.id, session.id);
     } catch (error) {
-      try { await stripe.checkout.sessions.expire(session.id); await OrderService.markOrderPaymentFailed(createdOrder.id); } catch {}
+      try { await stripe.checkout.sessions.expire(session.id); await OrderService.markOrderPaymentFailed(createdOrder.id); } catch { }
       throw error;
     }
     if (!session.url) {
-      try { await stripe.checkout.sessions.expire(session.id); await OrderService.markOrderPaymentFailed(createdOrder.id); } catch {}
+      try { await stripe.checkout.sessions.expire(session.id); await OrderService.markOrderPaymentFailed(createdOrder.id); } catch { }
       throw new Error("Stripe did not provide a checkout URL.");
     }
 
