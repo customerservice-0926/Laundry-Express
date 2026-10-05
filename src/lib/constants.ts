@@ -29,7 +29,9 @@ export const APP_CONFIG = {
   location: {
     city: "Lake in the Hills",
     state: "IL",
-    mapsUrl: "https://maps.google.com/?q=Lake+in+the+Hills,+IL",
+    country: "USA",
+    formatted: "Lake in the Hills, IL, USA",
+    mapsUrl: "https://maps.google.com/?q=Lake+in+the+Hills,+IL,+USA",
   },
   brandColors: {
     primary: "#EC4899", // Bubble Pink — main brand color

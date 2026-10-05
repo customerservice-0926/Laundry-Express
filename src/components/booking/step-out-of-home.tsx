@@ -51,12 +51,12 @@ export function StepOutOfHome({
   const [street, setStreet] = React.useState(addressDetails?.street ?? "");
   const [apt, setApt] = React.useState(addressDetails?.apt ?? "");
   const [city, setCity] = React.useState(addressDetails?.city ?? defaultZone.city);
-  const [state, setState] = React.useState(addressDetails?.state ?? "");
+  const [state, setState] = React.useState(addressDetails?.state || "IL");
   const [zip, setZip] = React.useState(addressDetails?.zip ?? defaultZone.zip);
 
   const isInitialFetchDone = React.useRef(false);
   const isAddressInvalid = showValidationErrors && (
-    address.trim().length < 5 || !city.trim() || !/^[A-Z]{2}$/.test(state.trim()) || !/^\d{5}(-\d{4})?$/.test(zip.trim())
+    address.trim().length < 5 || !city.trim() || !zip.trim() || !/^\d{5}(-\d{4})?$/.test(zip.trim())
   );
 
   const push = React.useCallback((s: string, a: string, c: string, z: string, stateValue: string) => {

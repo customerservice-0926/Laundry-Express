@@ -1,50 +1,59 @@
 # Laundry Express — Complete System & Service Documentation for LLMs
 
-> Official AI & Machine-Readable Context for Laundry Express (www.laundryexpressservices.com)
-> Updated: October 2026
+> Official AI & Machine-Readable System Documentation for Laundry Express (www.laundryexpressservices.com).
+> Primary Location: Lake in the Hills, IL, USA.
 
-## 1. Overview
-Laundry Express is a premium doorstep wash-and-fold laundry service operating in Lake in the Hills, Illinois, and surrounding communities. The platform provides on-demand doorstep laundry pickup, cold-water eco-friendly wash, crisp professional folding, and 24-hour return delivery.
+## Overview
+Laundry Express provides premium 24-hour wash-and-fold doorstep laundry service headquartered in Lake in the Hills, IL, USA, and serving nearby Illinois communities. Every order is processed in individual machine cycles using cold-water eco-friendly wash, gentle drying, and protective packaging.
 
-## 2. Core Service Offerings & Pricing Models
+## Location & Service Region
+- **Headquarters**: Lake in the Hills, IL, USA
+- **State**: Illinois (IL)
+- **Primary Delivery Zones**: Lake in the Hills (60156), Algonquin (60102), Crystal Lake (60014), Huntley (60142), and adjacent Illinois zones.
+
+## Core Capabilities & Laundry Services
+- **Wash and Fold Doorstep Pickup & Delivery**: Full-service residential and commercial laundry with guaranteed 24-hour turnaround.
+- **By-the-Bag Wash & Fold (13-Gallon Capacity)**: Standard laundry volume (~15–20 lbs / 2 loads) per 13-gallon bag with flat pricing.
+- **Weighed Laundry by the Pound (lbs)**: Ideal for everyday apparel, sheets, bed linens, towels, and bulk laundry.
+- **Individual Washer & Dryer Cycles**: Strictly dedicated equipment per client order (zero laundry co-mingling or cross-contamination).
+- **Eco-Friendly Fabric Care**: Cold-water wash cycles preserving garment color and fiber integrity, paired with gentle tumble drying.
+- **Custom Detergent Bar**: Hypoallergenic plant-based formulas, Free & Clear, Tide, Gain, and Persil options.
+- **Contactless Doorstep Protocol**: Away-from-home secure pickup and return with driver delivery verification.
+- **100% Satisfaction Guarantee**: Free prompt re-wash on any order that does not meet pristine freshness standards.
+
+## Public Resources & Navigation
+
+- [Home Page](https://www.laundryexpressservices.com/): Public landing page with order lifecycle, testimonials, and booking wizard for Lake in the Hills, IL, USA.
+- [Pricing and Service Plans](https://www.laundryexpressservices.com/pricing): By-the-bag, by-the-pound, and package credit models.
+- [Contact Support](https://www.laundryexpressservices.com/contact): Direct contact channels, phone, email, and service coverage questions.
+- [Terms & Guarantees](https://www.laundryexpressservices.com/terms): 100% satisfaction guarantee, cancellation terms, and privacy policies.
+- [XML Sitemap](https://www.laundryexpressservices.com/sitemap.xml): Complete URL index for web indexers.
+
+## Service Offerings & Pricing Models
 1. **By the Bag (13-Gallon Standard Kitchen Bag)**:
-   - Approximate capacity: 2 full loads of laundry (~15-20 lbs).
-   - Flat per-bag rate established by operations (live rates visible on website).
-   - Free return delivery when ordering at or above the free delivery bag threshold (typically 2+ bags).
+   - Approximate capacity: 2 full laundry loads (~15–20 lbs).
+   - Flat per-bag rate established by business operations.
+   - Free return delivery when meeting or exceeding the minimum bag threshold.
 
 2. **By the Pound (lbs)**:
-   - Ideal for bulk garments, comforters, linens, and commercial items.
-   - Charged per pound with defined minimum (e.g., 15 lbs) and maximum limits.
-   - Free return delivery when order exceeds the pound threshold (e.g., 25+ lbs).
+   - Suited for bulk laundry, everyday garments, linens, and weighted loads.
+   - Charged per pound with defined minimum and maximum limits.
+   - Free return delivery when order exceeds free delivery pound threshold.
 
 3. **Saver Packages**:
-   - Pre-discounted multi-order bundles and credits managed directly by business operations.
+   - Discounted bundles and credits managed directly by business operations.
 
-## 3. Detergent Catalog & Fabric Care
+## Detergent Catalog & Fabric Care
 - **Eco-Conscious Cold Water Wash**: Gentle cycle preserving colors and fabric longevity.
-- **Detergent Choices**:
-  - Tide Original / Mountain Spring
-  - Gain Aroma Boost
-  - Seventh Generation (Hypoallergenic, plant-based, fragrance-free)
-  - Persil ProClean Deep Clean
-  - Free & Clear / Sensitive Skin
+- **Formulation Options**: Hypoallergenic plant-based, Tide, Gain, Persil, and Free & Clear sensitive options.
 
-## 4. Scheduling & Logistics
-- **Pickup Windows**:
-  - Morning Window: 8:00 AM – 12:00 PM
-  - Afternoon Window: 1:00 PM – 6:00 PM
+## Scheduling & Doorstep Logistics
+- **Pickup Windows**: Morning (8:00 AM – 12:00 PM) and Afternoon (1:00 PM – 6:00 PM).
 - **Turnaround Guarantee**: Standard delivery back within 24 hours of pickup.
-- **Home Presence Options**:
-  - *Home*: Driver rings the bell upon arrival.
-  - *Away*: Contactless doorstep pickup with mandatory doorstep bag confirmation.
+- **Home Presence Options**: Home (driver rings bell) or Away (contactless doorstep placement).
 
-## 5. Guarantees & Policies
-- **Zero Lost-Garment Guarantee**: Individual machine cycles per customer order (laundry is never co-mingled).
-- **100% Satisfaction Free Re-Wash**: If garments are not fresh and spotless, customer receives an immediate free re-wash.
-- **Verified Order Reviews**: Only authenticated customers who have completed an order can submit ratings and 3-photo proof reviews.
-
-## 6. Official Contact & Support
-- **Support Phone**: (815) 575-9536
-- **Support Email**: customerservice@laundryexpressservices.com
+## Contact & Location Details
+- **Location**: Lake in the Hills, IL, USA
+- **Phone**: (815) 575-9536
+- **Email**: customerservice@laundryexpressservices.com
 - **Website**: https://www.laundryexpressservices.com/
-- **Sitemap**: https://www.laundryexpressservices.com/sitemap.xml

@@ -21,7 +21,7 @@ export function validateCheckoutPayload(input: unknown): string | null {
     !PICKUP_SLOTS.includes(body.pickup_slot) ||
     typeof body.street_address !== "string" || body.street_address.trim().length < 5 ||
     typeof body.city !== "string" || !body.city.trim() ||
-    typeof body.state !== "string" || !/^[A-Z]{2}$/.test(body.state.trim()) ||
+    typeof body.state !== "string" || body.state.trim().toUpperCase() !== "IL" ||
     typeof body.zip_code !== "string" || !/^\d{5}(-\d{4})?$/.test(body.zip_code.trim()) ||
     typeof body.customer_phone !== "string" || body.customer_phone.trim().length < 7
   ) {

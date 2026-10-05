@@ -76,12 +76,11 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV !== "production";
   const policy = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://js.stripe.com https://maps.googleapis.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
-    `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
+    `script-src 'self' 'unsafe-inline' https://accounts.google.com https://js.stripe.com https://maps.googleapis.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "style-src-attr 'unsafe-inline'",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://*.supabase.co https://images.unsplash.com",
@@ -94,7 +93,6 @@ export async function proxy(req: NextRequest) {
     "frame-ancestors 'self'",
   ].join("; ");
   const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", policy);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", policy);

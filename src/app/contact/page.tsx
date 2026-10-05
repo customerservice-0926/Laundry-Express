@@ -7,12 +7,13 @@ import { APP_CONFIG } from "@/lib/constants";
 import { Phone } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Contact Us & Operations Hub — Laundry Express",
+  title: "Contact Us & Operations Hub — Lake in the Hills, IL, USA",
   description:
-    "Contact Laundry Express for customer support, service coverage, and pickup scheduling.",
+    "Contact Laundry Express in Lake in the Hills, IL, USA for doorstep laundry customer support, service coverage, and pickup scheduling.",
   keywords: [
     "contact laundry express",
-    "laundry express location",
+    "lake in the hills laundry service",
+    "lake in the hills il usa laundry pickup",
     "customer support laundry",
     "doorstep laundry pickup",
   ],
@@ -20,8 +21,8 @@ export const metadata: Metadata = {
     canonical: "/contact",
   },
   openGraph: {
-    title: "Contact Laundry Express — Doorstep Laundry Heroes",
-    description: "Customer support, service coverage, and pickup scheduling.",
+    title: "Contact Laundry Express — Lake in the Hills, IL, USA",
+    description: "Customer support, service coverage, and pickup scheduling in Lake in the Hills, IL, USA.",
     url: `${APP_CONFIG.url}/contact`,
     siteName: "Laundry Express",
     images: [{ url: "/brand/logo-badge.jpg", width: 1200, height: 630, alt: "Laundry Express Contact" }],

@@ -35,11 +35,20 @@ export const metadata: Metadata = {
     "Laundry Express provides doorstep laundry pickup, wash-and-fold service, and delivery in Lake in the Hills, Illinois and nearby service areas. Review current plans and service coverage online.",
   keywords: [
     "laundry express",
-    "doorstep laundry service",
-    "wash and fold pickup",
-    "free laundry delivery",
-    "In 24h laundry delivery",
-    "commercial laundry by pound",
+    "laundry pickup and delivery service",
+    "wash and fold laundry Lake in the Hills IL",
+    "doorstep laundry service Lake in the Hills IL USA",
+    "24 hour wash and fold return",
+    "fluff and fold laundry Illinois",
+    "residential laundry pickup McHenry County",
+    "commercial laundry by the pound",
+    "eco-friendly cold water laundry wash",
+    "hypoallergenic detergent laundry service",
+    "professional laundry folding service",
+    "contactless doorstep laundry pickup",
+    "laundry service Algonquin IL",
+    "laundry service Crystal Lake IL",
+    "laundry service Huntley IL",
   ],
   applicationName: "Laundry Express",
   authors: [{ name: "Laundry Express Team" }],
@@ -101,6 +110,39 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "DryCleaningOrLaundry",
+  name: APP_CONFIG.name,
+  description: APP_CONFIG.description,
+  url: APP_CONFIG.url,
+  telephone: APP_CONFIG.supportPhone,
+  email: APP_CONFIG.supportEmail,
+  image: `${APP_CONFIG.url}/brand/logo-badge.jpg`,
+  priceRange: "$$",
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: APP_CONFIG.location.city,
+    addressRegion: APP_CONFIG.location.state,
+    addressCountry: APP_CONFIG.location.country,
+    postalCode: "60156",
+  },
+  geo: {
+    "@type": "GeoCoordinates",
+    latitude: 42.1817,
+    longitude: -88.3315,
+  },
+  areaServed: ["Lake in the Hills", "Algonquin", "Crystal Lake", "Huntley"],
+  openingHoursSpecification: [
+    {
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+      opens: "08:00",
+      closes: "18:00",
+    },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -113,6 +155,12 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         suppressHydrationWarning
         className="min-h-full flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-sky-500 selection:text-white"

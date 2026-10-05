@@ -74,7 +74,10 @@ export function generateInvoiceHtml(inv: UnifiedInvoiceInput): string {
   const statusColor = inv.orderCancelled ? "#c2410c" : "#047857";
   const statusText = inv.orderCancelled ? "PAID — ORDER CANCELLED" : "PAID &amp; CONFIRMED";
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || APP_CONFIG.url || "https://www.laundryexpressservices.com";
+  const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || APP_CONFIG.url || "https://www.laundryexpressservices.com";
+  const siteUrl = (!rawSiteUrl || rawSiteUrl.includes("localhost") || rawSiteUrl.includes("127.0.0.1"))
+    ? "https://www.laundryexpressservices.com"
+    : rawSiteUrl;
   const logoUrl = typeof window !== "undefined" ? "/brand/logo-badge.jpg" : `${siteUrl.replace(/\/$/, "")}/brand/logo-badge.jpg`;
 
   return `<!DOCTYPE html>

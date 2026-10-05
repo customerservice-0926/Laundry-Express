@@ -11,14 +11,14 @@ import { CheckCircle2, ShieldCheck, Zap } from "lucide-react";
 export const metadata: Metadata = {
   title: "Plans & Pricing — Transparent Laundry Rates",
   description:
-    "View current doorstep laundry rates, weight-based services, and administrator-managed packages.",
+    "View current doorstep laundry rates, weight-based wash and fold services, and saver packages in Lake in the Hills, IL, USA.",
   alternates: {
     canonical: "/pricing",
   },
   openGraph: {
-    title: "Laundry Express — Plans & Pricing",
+    title: "Laundry Express — Plans & Pricing | Lake in the Hills, IL",
     description:
-      "Compare current wash-and-fold pricing options and packages available from Laundry Express.",
+      "Compare transparent wash-and-fold pricing options, 13-gallon bags, and saver packages in Lake in the Hills, IL, USA.",
     url: `${APP_CONFIG.url}/pricing`,
     siteName: "Laundry Express",
     images: [{ url: "/brand/logo-badge.jpg", width: 1200, height: 630, alt: "Laundry Express Pricing" }],
