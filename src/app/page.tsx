@@ -12,9 +12,22 @@ import { APP_CONFIG } from "@/lib/constants";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_CONFIG.url),
-  title: "Laundry Express — Pick Up • Wash • Fold • Deliver | More Time For What Matters",
+  title: "Laundry Express — 24-Hour Wash & Fold Doorstep Service | Lake in the Hills, IL",
   description:
-    "Professional doorstep laundry pickup, wash, fold, and delivery. View current plans, service areas, and pickup windows.",
+    "Professional doorstep laundry pickup, gentle cold-water wash, precision folding, and guaranteed 24-hour return in Lake in the Hills, IL, USA. Choose by-the-bag, by-the-pound, or custom packages.",
+  keywords: [
+    "laundry pickup and delivery",
+    "wash and fold Lake in the Hills IL",
+    "doorstep laundry service Illinois",
+    "wash dry fold delivery",
+    "next day laundry return",
+    "laundry by the bag 13 gallon",
+    "bulk laundry by the pound lbs",
+    "hypoallergenic laundry wash",
+    "commercial linen laundry McHenry County",
+    "fluff and fold service Algonquin IL",
+    "residential laundry Crystal Lake IL",
+  ],
   alternates: {
     canonical: "/",
   },

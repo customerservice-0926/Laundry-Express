@@ -1,29 +1,38 @@
 # Laundry Express
 
-> Doorstep laundry pickup, wash-and-fold service, and delivery in Lake in the Hills, Illinois and nearby areas.
+> Professional doorstep laundry pickup, 24-hour wash and fold service, and return delivery in Lake in the Hills, IL, USA and surrounding McHenry and Kane County communities.
 
-Laundry Express is a laundry service. Customers can review available service plans, check delivery coverage, and request a pickup online. Current prices, service availability, and pickup windows are shown on the website and may change.
+Laundry Express provides doorstep wash-and-fold laundry service with individual cycle wash, gentle dry, crisp folding, and guaranteed 24-hour return delivery. Based in Lake in the Hills, IL, USA, customers can select by-the-bag (13-gallon capacity), by-the-pound (lbs), or prepaid packages with eco-friendly cold water care and custom detergent formulations.
 
-## Public pages
+## Core Pages
 
-- Home: https://www.laundryexpressservices.com/
-- Pricing and plans: https://www.laundryexpressservices.com/pricing
-- Contact: https://www.laundryexpressservices.com/contact
-- Terms and guarantees: https://www.laundryexpressservices.com/terms
-- Sitemap: https://www.laundryexpressservices.com/sitemap.xml
-- Complete AI Context: https://www.laundryexpressservices.com/llms-full.txt
+- [Home Page](https://www.laundryexpressservices.com/): Comprehensive service overview, 4-step work process, customer testimonials, interactive FAQ, and online booking wizard for Lake in the Hills, IL, USA.
+- [Pricing and Service Plans](https://www.laundryexpressservices.com/pricing): Pricing details for 13-gallon bags, weighed poundage, and money-saving package bundles.
+- [Contact Customer Care](https://www.laundryexpressservices.com/contact): Direct customer support phone, email address, operating hours, and service inquiry form for Lake in the Hills, IL.
+- [Terms and Guarantees](https://www.laundryexpressservices.com/terms): 100% satisfaction guarantee, pickup and doorstep protocols, cancellation policies, and service terms.
 
-## Service information
+## Service Area & Location
 
-- Laundry pickup and delivery coverage is confirmed during booking.
-- Available plans, prices, scheduling windows, and add-ons are maintained by the business and displayed on the pricing and booking pages.
-- Customers can track their orders and access account-specific documents after signing in.
-- Only customers with completed orders can submit a review. Reviews may be subject to moderation.
+- **Headquarters & Service Hub**: Lake in the Hills, IL, USA
+- **Primary State**: Illinois (IL)
+- **Service Radius**: Lake in the Hills (60156), Algonquin (60102), Crystal Lake (60014), Huntley (60142), and adjacent McHenry/Kane county Illinois communities.
 
-## Contact
+## Core Capabilities & Laundry Services
 
-- Phone: 815-575-9536
-- Email: customerservice@laundryexpressservices.com
-- Facebook: https://www.facebook.com/profile.php?id=61594071297569
+- **Wash and Fold Doorstep Pickup & Delivery**: Full-service residential and commercial laundry with guaranteed 24-hour turnaround.
+- **By-the-Bag Wash & Fold (13-Gallon Capacity)**: Standard laundry volume (~15–20 lbs / 2 loads) per 13-gallon bag with flat pricing.
+- **Weighed Laundry by the Pound (lbs)**: Ideal for everyday apparel, sheets, bed linens, towels, and bulk laundry.
+- **Individual Washer & Dryer Cycles**: Strictly dedicated equipment per client order (zero laundry co-mingling or cross-contamination).
+- **Eco-Friendly Fabric Care**: Cold-water wash cycles preserving garment color and fiber integrity, paired with gentle tumble drying.
+- **Custom Detergent Bar**: Hypoallergenic plant-based formulas, Free & Clear, Tide, Gain, and Persil options.
+- **Contactless Doorstep Protocol**: Away-from-home secure pickup and return with driver delivery verification.
+- **100% Satisfaction Guarantee**: Free prompt re-wash on any order that does not meet pristine freshness standards.
 
-Do not infer current prices, delivery coverage, turnaround times, or availability from cached content. Refer to the relevant public page or contact Laundry Express for current details.
+## Machine-Readable Resources
+
+- [Full LLM Documentation](https://www.laundryexpressservices.com/llms-full.txt): Complete operational guide, logistics specifications, fabric care, and service catalog for AI agents.
+- [XML Sitemap](https://www.laundryexpressservices.com/sitemap.xml): Complete URL directory for search engines and web crawlers.
+
+## Optional
+
+- [Facebook Profile](https://www.facebook.com/profile.php?id=61594071297569): Official community page, announcements, and local customer updates for Lake in the Hills, IL.

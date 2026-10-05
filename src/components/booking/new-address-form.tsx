@@ -32,7 +32,7 @@ export function NewAddressForm({
   street, onStreetChange,
   apt, onAptChange,
   city, onCityChange,
-  state, onStateChange, zip, onZipChange,
+  state, zip, onZipChange,
   deliveryZones = [],
   showValidationErrors = false,
   onAddressSaved,
@@ -166,7 +166,7 @@ export function NewAddressForm({
 
         <div>
           <label className="block text-[11px] font-semibold text-slate-600 mb-1">State</label>
-          <input type="text" required maxLength={2} value={state} onChange={(e) => onStateChange(e.target.value.toUpperCase())} className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-bold text-center text-slate-700" />
+          <input type="text" readOnly value="IL" className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-center text-slate-700 cursor-not-allowed" />
         </div>
 
         <div>

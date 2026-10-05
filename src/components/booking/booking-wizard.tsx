@@ -107,7 +107,7 @@ export function BookingWizard({
   );
 
   const isStep3Valid = isDateValid && isDropoffValid && Boolean(selectedSlot) && !isSelectedSlotClosed;
-  const isAddressValid = address.trim().length >= 5 && Boolean(addressDetails?.city.trim()) && /^[A-Z]{2}$/.test(addressDetails?.state.trim() || "") && /^\d{5}(-\d{4})?$/.test(addressDetails?.zip.trim() || "");
+  const isAddressValid = address.trim().length >= 5 && Boolean(addressDetails?.city.trim()) && (addressDetails?.state.trim() || "IL") === "IL" && /^\d{5}(-\d{4})?$/.test(addressDetails?.zip.trim() || "");
   const isStep4Valid = Boolean(isAddressValid && phoneValue.trim().length >= 7 && (!isOutOfHome || bagConfirmed));
 
   const handleConfirm = () => {
