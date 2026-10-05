@@ -6,6 +6,7 @@ import type { PricingMode, User, PricingConfig } from "@/types";
 import type { CouponItem } from "@/lib/services/coupon-service";
 import { calculateOrderPrice } from "@/lib/stripe/pricing-calc";
 import { useDetergents } from "@/hooks/use-detergents";
+import { usePackagePlans } from "@/hooks/use-package-plans";
 import { WizardStepper } from "./wizard-stepper";
 import { StepPricingMode } from "./step-pricing-mode";
 import { StepBagCounter } from "./step-bag-counter";
@@ -31,10 +32,14 @@ export interface BookingWizardProps {
 const STEPS = ["Plan & Quantity", "Detergent", "Schedule", "Address", "Review", "Payment"];
 
 export function BookingWizard({
-  initialMode = "per_bag", initialBagCount = 2, initialWeightLbs, initialPricing, currentUser = null,
+  initialMode = "per_bag", initialBagCount = 2, initialWeightLbs, initialPackageId, initialPricing, currentUser = null,
 }: BookingWizardProps) {
   const [step, setStep] = React.useState(1);
-  const [pricingMode, setPricingMode] = React.useState<PricingMode>(initialMode);
+  const [requestedMode, setPricingMode] = React.useState<PricingMode>(initialMode);
+  const [packageId, setPackageId] = React.useState(initialPackageId ?? "");
+  const { plans: packagePlans, isLoading: isLoadingPackages } = usePackagePlans();
+  const selectedPackage = packagePlans.find((p) => p.id === packageId) ?? packagePlans[0];
+  const pricingMode: PricingMode = requestedMode === "package" && !selectedPackage ? "per_bag" : requestedMode;
   const [bagCount, setBagCount] = React.useState(initialBagCount);
   const [weightLbs, setWeightLbs] = React.useState(() => Number(initialWeightLbs ?? initialPricing?.min_lbs ?? 0));
   const [selectedDetergentId, setSelectedDetergentId] = React.useState("");
@@ -73,8 +78,9 @@ export function BookingWizard({
       promo: appliedCoupon, base_bag_price: rates.bagPrice, base_pound_price: rates.poundPrice,
       min_bags: rates.minBags, max_bags: rates.maxBags, min_lbs: rates.minLbs, max_lbs: rates.maxLbs,
       free_delivery_lbs: rates.freeDeliveryLbs, one_bag_delivery_fee: rates.deliveryFee, free_delivery_threshold: rates.freeDeliveryBags,
+      package: pricingMode === "package" && selectedPackage ? { price: selectedPackage.discounted_price, capacity: selectedPackage.capacity, unit_type: selectedPackage.unit_type } : undefined,
     });
-  }, [isConfigLoading, configError, pricingIsValid, pricingMode, boundedBagCount, boundedWeightLbs, selectedDetergentId, selectedDetergent?.price, appliedCoupon, rates]);
+  }, [isConfigLoading, configError, pricingIsValid, pricingMode, boundedBagCount, boundedWeightLbs, selectedDetergentId, selectedDetergent?.price, appliedCoupon, rates, selectedPackage]);
 
   const handleApplyPromo = async () => {
     if (!priceResult || !promoCode.trim()) return;
@@ -86,7 +92,7 @@ export function BookingWizard({
     } catch { setPromoError("Failed to validate coupon."); }
   };
 
-  const isStep1Valid = pricingMode === "per_lb" ? (boundedWeightLbs >= rates.minLbs && boundedWeightLbs <= rates.maxLbs && !isNaN(boundedWeightLbs)) : pricingMode === "per_bag" && boundedBagCount >= rates.minBags && boundedBagCount <= rates.maxBags;
+  const isStep1Valid = pricingMode === "package" ? Boolean(selectedPackage) : pricingMode === "per_lb" ? (boundedWeightLbs >= rates.minLbs && boundedWeightLbs <= rates.maxLbs && !isNaN(boundedWeightLbs)) : boundedBagCount >= rates.minBags && boundedBagCount <= rates.maxBags;
   const isStep2Valid = Boolean(selectedDetergentId);
   const todayStr = serverTime?.todayStr || new Date().toISOString().split("T")[0];
   const nowHour = serverTime?.currentHour ?? new Date().getHours();
@@ -107,7 +113,7 @@ export function BookingWizard({
   const handleConfirm = () => {
     if (!priceResult) return;
     checkout({
-      currentUser, pricingMode, bagCount: boundedBagCount, weightLbs: boundedWeightLbs, selectedDetergentId,
+      currentUser, pricingMode, packageId: selectedPackage?.id, bagCount: boundedBagCount, weightLbs: boundedWeightLbs, selectedDetergentId,
       selectedDate, selectedSlot, dropoffDate, address, phone: phoneValue, addressDetails, isOutOfHome,
       isAwayForDropoff, bagConfirmed, notes, priceResult, paymentMethod, coupon: appliedCoupon,
     });
@@ -115,9 +121,9 @@ export function BookingWizard({
 
   return (
     <div id="book-now" className="scroll-mt-24 py-4 w-full max-w-full">
-      {isConfigLoading || configError || !priceResult ? (
-        <div role={isConfigLoading ? "status" : "alert"} className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-700">
-          {isConfigLoading ? "Loading current service settings..." : configError || "Pricing is not configured correctly. Please contact Laundry Express."}
+      {isConfigLoading || isLoadingPackages || configError || !priceResult ? (
+        <div role={isConfigLoading || isLoadingPackages ? "status" : "alert"} className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-700">
+          {isConfigLoading || isLoadingPackages ? "Loading current service settings..." : configError || "Pricing is not configured correctly. Please contact Laundry Express."}
         </div>
       ) : (
       <>
@@ -127,8 +133,8 @@ export function BookingWizard({
           <div className="lg:col-span-2 space-y-6">
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <StepPricingMode selectedMode={pricingMode} onSelectMode={setPricingMode} bagPrice={rates.bagPrice} poundPrice={rates.poundPrice} minLbs={rates.minLbs} freeDeliveryBags={rates.freeDeliveryBags} freeDeliveryLbs={rates.freeDeliveryLbs} />
-                <StepBagCounter pricingMode={pricingMode} bagCount={boundedBagCount} onBagCountChange={setBagCount} minBags={rates.minBags} maxBags={rates.maxBags} weightLbs={boundedWeightLbs} onWeightLbsChange={setWeightLbs} bagPrice={rates.bagPrice} freeDeliveryBags={rates.freeDeliveryBags} minLbs={rates.minLbs} maxLbs={rates.maxLbs} freeDeliveryLbs={rates.freeDeliveryLbs} />
+                <StepPricingMode selectedMode={pricingMode} onSelectMode={setPricingMode} bagPrice={rates.bagPrice} poundPrice={rates.poundPrice} minLbs={rates.minLbs} freeDeliveryBags={rates.freeDeliveryBags} freeDeliveryLbs={rates.freeDeliveryLbs} packageFromPrice={packagePlans.length ? Math.min(...packagePlans.map((p) => p.discounted_price)) : undefined} />
+                <StepBagCounter pricingMode={pricingMode} bagCount={boundedBagCount} onBagCountChange={setBagCount} minBags={rates.minBags} maxBags={rates.maxBags} weightLbs={boundedWeightLbs} onWeightLbsChange={setWeightLbs} bagPrice={rates.bagPrice} freeDeliveryBags={rates.freeDeliveryBags} minLbs={rates.minLbs} maxLbs={rates.maxLbs} freeDeliveryLbs={rates.freeDeliveryLbs} packages={packagePlans} selectedPackageId={selectedPackage?.id} onSelectPackage={setPackageId} />
                 <div className="flex justify-end pt-2">
                   <Button variant="hero" size="lg" disabled={!isStep1Valid} onClick={() => isStep1Valid && setStep(2)}>Continue to Detergent <ArrowRight className="h-4 w-4 ml-2" /></Button>
                 </div>
@@ -183,7 +189,7 @@ export function BookingWizard({
               </div>
             )}
             {step === 5 && (
-              <StepReview pricingMode={pricingMode} bagCount={boundedBagCount} weightLbs={boundedWeightLbs} selectedDetergentId={selectedDetergentId} selectedDate={selectedDate} selectedSlot={selectedSlot} address={address} phone={phoneValue} isOutOfHome={isOutOfHome} slot1Start={settings.slot1Start} slot1End={settings.slot1End} slot2Start={settings.slot2Start} slot2End={settings.slot2End} onEditStep={setStep} onBack={() => setStep(4)} onContinue={() => setStep(6)} />
+              <StepReview pricingMode={pricingMode} bagCount={boundedBagCount} weightLbs={boundedWeightLbs} packageName={selectedPackage?.name} packageCapacity={selectedPackage?.capacity} packageUnit={selectedPackage?.unit_type} selectedDetergentId={selectedDetergentId} selectedDate={selectedDate} selectedSlot={selectedSlot} address={address} phone={phoneValue} isOutOfHome={isOutOfHome} slot1Start={settings.slot1Start} slot1End={settings.slot1End} slot2Start={settings.slot2Start} slot2End={settings.slot2End} onEditStep={setStep} onBack={() => setStep(4)} onContinue={() => setStep(6)} />
             )}
             {step === 6 && (
               <StepPayment priceResult={priceResult} promoCode={promoCode} onPromoCodeChange={setPromoCode} onApplyPromo={handleApplyPromo} promoError={promoError} paymentMethod={paymentMethod} onSelectPaymentMethod={setPaymentMethod} isProcessing={isProcessing} onConfirm={handleConfirm} onBack={() => setStep(5)} />

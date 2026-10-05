@@ -49,13 +49,15 @@ export function orderToUnifiedInvoice(
     order.pricing_mode === "per_bag"
       ? "By The Bag Wash & Fold (13 Gal)"
       : order.pricing_mode === "package"
-        ? "Saver Package Credit"
+        ? (order.package_name ? `${order.package_name}` : "Wash & Fold Package Plan")
         : "By The Pound (lb) Wash & Fold";
 
   const quantityLabel =
     order.pricing_mode === "per_bag"
-      ? `${order.bag_count || 1} Bag(s)`
-      : `${order.final_weight_lbs || order.estimated_weight_lbs || 15} lbs`;
+      ? `${order.bag_count || 1} Bag(s) (13 Gal each)`
+      : order.pricing_mode === "package"
+        ? (order.bag_count > 0 ? `${order.bag_count} Bag(s) Included` : `${order.final_weight_lbs || order.estimated_weight_lbs || 0} lbs Included`)
+        : `${order.final_weight_lbs || order.estimated_weight_lbs || 15} lbs`;
 
   const orderDate = order.created_at
     ? new Date(order.created_at).toLocaleDateString("en-US", {

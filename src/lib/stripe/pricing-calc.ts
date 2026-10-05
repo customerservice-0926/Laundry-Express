@@ -20,6 +20,7 @@ export interface CalculatePriceInput {
   free_delivery_lbs: number;
   one_bag_delivery_fee: number;
   free_delivery_threshold: number;
+  package?: { price: number; capacity: number; unit_type: "bag" | "lb" };
 }
 
 export interface CalculatedPriceResult {
@@ -81,10 +82,13 @@ export function calculateOrderPrice(input: CalculatePriceInput): CalculatedPrice
     // Free delivery rule: weight >= freePoundThreshold = FREE ($0.00), otherwise stdDeliveryFee
     deliveryFee = unitCount >= freePoundThreshold ? 0 : stdDeliveryFee;
   } else if (input.pricing_mode === "package") {
-    unitCount = 1;
-    unitName = "package credit";
-    unitRate = 0;
-    subtotal = 0;
+    if (!input.package || input.package.price <= 0 || input.package.capacity <= 0) {
+      throw new Error("Choose an available package.");
+    }
+    unitCount = input.package.capacity;
+    unitName = input.package.unit_type === "lb" ? "lbs" : "bags";
+    unitRate = Math.round((input.package.price / unitCount) * 100) / 100;
+    subtotal = Math.round(input.package.price * 100) / 100;
     deliveryFee = 0;
   }
 

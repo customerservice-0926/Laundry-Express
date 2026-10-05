@@ -1,4 +1,4 @@
-import { ShoppingBag, Scale, Sparkles } from "lucide-react";
+import { ShoppingBag, Scale, Sparkles, Gift } from "lucide-react";
 import type { PricingMode } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,7 @@ interface StepPricingModeProps {
   minLbs: number;
   freeDeliveryBags: number;
   freeDeliveryLbs: number;
+  packageFromPrice?: number;
 }
 
 export function StepPricingMode({
@@ -20,6 +21,7 @@ export function StepPricingMode({
   minLbs,
   freeDeliveryBags,
   freeDeliveryLbs,
+  packageFromPrice,
 }: StepPricingModeProps) {
   const modes: Array<{
     id: PricingMode;
@@ -45,6 +47,14 @@ export function StepPricingMode({
       priceLabel: `$${poundPrice.toFixed(2)} / lb (${minLbs} lbs min)`,
       icon: Scale,
     },
+    ...(packageFromPrice ? [{
+      id: "package" as const,
+      title: "Saver Package",
+      badge: "Free Delivery",
+      description: "Prepaid bundles set by Laundry Express at a discounted rate.",
+      priceLabel: `From $${packageFromPrice.toFixed(2)}`,
+      icon: Gift,
+    }] : []),
   ];
 
   return (
@@ -56,7 +66,7 @@ export function StepPricingMode({
         </h4>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={cn("grid grid-cols-1 gap-4", modes.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2")}>
         {modes.map((mode) => {
           const Icon = mode.icon;
           const isSelected = selectedMode === mode.id;

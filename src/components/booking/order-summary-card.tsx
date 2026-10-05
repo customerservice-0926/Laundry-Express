@@ -25,8 +25,8 @@ export function OrderSummaryCard({
   const weightDisplay = React.useMemo(() => {
     if (pricingMode === "per_bag") return `${bagCount} Bag(s) · ${bagCount * 13} Gal (~${(bagCount * 15).toFixed(0)} lbs)`;
     if (pricingMode === "per_lb") return `${weightLbs.toFixed(0)} lbs Weighed Laundry`;
-    return "Prepaid Bundle Credit";
-  }, [pricingMode, bagCount, weightLbs]);
+    return `${breakdown.unit_count} ${breakdown.unit_name} Package`;
+  }, [pricingMode, bagCount, weightLbs, breakdown]);
 
   return (
     <div className="bg-white rounded-2xl border-2 border-pink-100 shadow-md p-6 space-y-4 sticky top-24">

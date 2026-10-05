@@ -21,6 +21,8 @@ export function mapOrderRecord(item: OrderRecord): Order {
     order_number: String(item.order_number),
     user_id: String(item.user_id || ""),
     pricing_mode: item.plan_type === "per_lb" ? "per_lb" : item.plan_type === "package" ? "package" : "per_bag",
+    package_id: item.package_id ? String(item.package_id) : undefined,
+    package_name: item.package_name ? String(item.package_name) : undefined,
     bag_count: Number(item.bag_count ?? 0),
     estimated_weight_lbs: Number(item.estimated_weight_lbs ?? item.weight_lbs ?? 0),
     final_weight_lbs: item.final_weight_lbs == null ? null : Number(item.final_weight_lbs),

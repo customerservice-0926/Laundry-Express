@@ -1,5 +1,6 @@
-import { Plus, Minus, ShoppingBag, Zap, Scale, CheckCircle2 } from "lucide-react";
+import { Plus, Minus, ShoppingBag, Zap, Scale } from "lucide-react";
 import type { PricingMode } from "@/types";
+import type { PackagePlan } from "@/lib/services/pricing-plan-service";
 import { cn } from "@/lib/utils";
 
 interface StepBagCounterProps {
@@ -15,6 +16,9 @@ interface StepBagCounterProps {
   minLbs: number;
   maxLbs: number;
   freeDeliveryLbs: number;
+  packages?: PackagePlan[];
+  selectedPackageId?: string;
+  onSelectPackage?: (id: string) => void;
 }
 
 export function StepBagCounter({
@@ -30,6 +34,9 @@ export function StepBagCounter({
   minLbs,
   maxLbs,
   freeDeliveryLbs,
+  packages = [],
+  selectedPackageId,
+  onSelectPackage,
 }: StepBagCounterProps) {
   const currentLbs = weightLbs ?? minLbs;
   const handleLbsChange = (val: number) => {
@@ -38,13 +45,29 @@ export function StepBagCounter({
 
   if (pricingMode === "package") {
     return (
-      <div className="p-5 rounded-2xl bg-sky-50 border border-sky-100 flex items-center gap-3">
-        <CheckCircle2 className="h-6 w-6 text-sky-600 shrink-0" />
-        <div>
-          <h5 className="text-sm font-bold text-slate-900">Pre-Paid Package Credit Active</h5>
-          <p className="text-xs text-slate-600 mt-0.5">
-            1 bag/credit will be automatically deducted from your account balance upon completed pickup.
-          </p>
+      <div className="space-y-3 p-5 rounded-2xl bg-white border border-slate-200">
+        <h5 className="font-bold text-sm text-slate-900">Select a Package</h5>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {packages.map((pkg) => {
+            const isSelected = pkg.id === selectedPackageId;
+            return (
+              <button
+                key={pkg.id}
+                type="button"
+                onClick={() => onSelectPackage?.(pkg.id)}
+                className={cn(
+                  "text-left p-4 rounded-xl border-2 transition-colors",
+                  isSelected ? "border-sky-600 bg-sky-50/70" : "border-slate-200 hover:border-slate-300"
+                )}
+              >
+                <span className="block font-bold text-sm text-slate-900 break-words">{pkg.name}</span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  {pkg.capacity} {pkg.unit_type === "lb" ? "lbs" : "bags"} included
+                </span>
+                <span className="block font-extrabold text-sm text-sky-700 mt-2">${pkg.discounted_price.toFixed(2)}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     );

@@ -67,28 +67,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: `Laundry weight must be between ${pricing.min_lbs} and ${pricing.max_lbs} lbs.` }, { status: 400 });
     }
 
+    const pkg = body.pricing_mode === "package"
+      ? (await PricingPlanService.getPlans()).find((p) => p.id === body.package_id && p.is_active)
+      : undefined;
+    if (body.pricing_mode === "package" && !pkg) return NextResponse.json({ success: false, error: "This package is no longer available." }, { status: 400 });
+    if (pkg) {
+      body.bag_count = pkg.unit_type === "bag" ? pkg.capacity : 0;
+      body.estimated_weight_lbs = pkg.unit_type === "lb" ? pkg.capacity : 0;
+    }
+
     const { detergents } = await CatalogService.getCatalog();
     const detergent = detergents.find((d) => d.id === body.detergent_id);
     if (!detergent?.is_active) return NextResponse.json({ success: false, error: "Choose an available detergent before checkout." }, { status: 400 });
     const detergentFee = detergent ? detergent.price : 0;
 
+    const priceInput = {
+      pricing_mode: body.pricing_mode, bag_count: body.bag_count, estimated_weight_lbs: body.estimated_weight_lbs, detergent_fee: detergentFee,
+      base_bag_price: pricing.base_bag_price, base_pound_price: pricing.base_pound_price, min_bags: pricing.min_bags, max_bags: pricing.max_bags,
+      min_lbs: pricing.min_lbs, max_lbs: pricing.max_lbs, free_delivery_lbs: pricing.free_delivery_lbs, one_bag_delivery_fee: pricing.one_bag_delivery_fee, free_delivery_threshold: pricing.free_delivery_threshold,
+      package: pkg ? { price: pkg.discounted_price, capacity: pkg.capacity, unit_type: pkg.unit_type } : undefined,
+    };
+
     let validatedCoupon: CouponItem | undefined;
     if (body.promo_code) {
-      const preliminaryPrice = calculateOrderPrice({
-        pricing_mode: body.pricing_mode || "per_bag", bag_count: body.bag_count, estimated_weight_lbs: body.estimated_weight_lbs, detergent_fee: detergentFee,
-        base_bag_price: pricing.base_bag_price, base_pound_price: pricing.base_pound_price, min_bags: pricing.min_bags, max_bags: pricing.max_bags,
-        min_lbs: pricing.min_lbs, max_lbs: pricing.max_lbs, free_delivery_lbs: pricing.free_delivery_lbs, one_bag_delivery_fee: pricing.one_bag_delivery_fee, free_delivery_threshold: pricing.free_delivery_threshold,
-      });
+      const preliminaryPrice = calculateOrderPrice(priceInput);
       const couponCheck = await CouponService.validateCoupon(body.promo_code, preliminaryPrice.subtotal);
       if (couponCheck.valid && couponCheck.coupon) validatedCoupon = couponCheck.coupon;
       else return NextResponse.json({ success: false, error: couponCheck.error || "Invalid coupon code." }, { status: 400 });
     }
 
     const serverPrice = calculateOrderPrice({
-      pricing_mode: body.pricing_mode || "per_bag", bag_count: body.bag_count, estimated_weight_lbs: body.estimated_weight_lbs, detergent_fee: detergentFee,
+      ...priceInput,
       promo: validatedCoupon ? { code: validatedCoupon.code, discount_type: validatedCoupon.discount_type, discount_value: validatedCoupon.discount_value } : undefined,
-      base_bag_price: pricing.base_bag_price, base_pound_price: pricing.base_pound_price, min_bags: pricing.min_bags, max_bags: pricing.max_bags,
-      min_lbs: pricing.min_lbs, max_lbs: pricing.max_lbs, free_delivery_lbs: pricing.free_delivery_lbs, one_bag_delivery_fee: pricing.one_bag_delivery_fee, free_delivery_threshold: pricing.free_delivery_threshold,
     });
 
     const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin;
@@ -100,10 +110,24 @@ export async function POST(req: NextRequest) {
     if (Math.round(serverPrice.total_amount * 100) < 50) return NextResponse.json({ success: false, error: "The order total is below Stripe's minimum payment amount." }, { status: 400 });
 
     const createdOrder = await OrderService.createOrder({
-      ...body, detergent_name: detergent.name, user_id: user.id, customer_name: user.full_name, customer_email: user.email,
-      customer_phone: body.customer_phone || user.phone || "", subtotal: serverPrice.subtotal, detergent_fee: serverPrice.detergent_fee,
-      delivery_fee: serverPrice.delivery_fee, discount_amount: serverPrice.discount_amount, coupon_code: validatedCoupon?.code || null,
-      tax_amount: serverPrice.tax_amount, total_amount: serverPrice.total_amount, payment_method: paymentMethod, payment_status: "pending", order_status: "pending",
+      ...body,
+      package_id: pkg?.id || null,
+      package_name: pkg?.name || null,
+      detergent_name: detergent.name,
+      user_id: user.id,
+      customer_name: user.full_name,
+      customer_email: user.email,
+      customer_phone: body.customer_phone || user.phone || "",
+      subtotal: serverPrice.subtotal,
+      detergent_fee: serverPrice.detergent_fee,
+      delivery_fee: serverPrice.delivery_fee,
+      discount_amount: serverPrice.discount_amount,
+      coupon_code: validatedCoupon?.code || null,
+      tax_amount: serverPrice.tax_amount,
+      total_amount: serverPrice.total_amount,
+      payment_method: paymentMethod,
+      payment_status: "pending",
+      order_status: "pending",
     });
 
     await syncUserOrderContact(user, body);
@@ -115,8 +139,8 @@ export async function POST(req: NextRequest) {
         price_data: {
           currency: "usd",
           product_data: {
-            name: `Laundry Express — ${createdOrder.pricing_mode === "per_bag" ? "By The Bag Wash & Fold" : createdOrder.pricing_mode === "package" ? "Saver Package Credit" : "By The Pound (lb)"}`,
-            description: `${createdOrder.pricing_mode === "per_bag" ? `${createdOrder.bag_count || 1} Bag(s)` : `${createdOrder.estimated_weight_lbs || 15} lbs`} • Cold Water Gentle Care • 24hr Return`,
+            name: `Laundry Express — ${pkg ? pkg.name : createdOrder.pricing_mode === "per_bag" ? "By The Bag Wash & Fold" : "By The Pound (lb)"}`,
+            description: `${createdOrder.pricing_mode === "per_lb" || pkg?.unit_type === "lb" ? `${createdOrder.estimated_weight_lbs} lbs` : `${createdOrder.bag_count} Bag(s)`} • Cold Water Gentle Care • 24hr Return`,
             images: [`${origin}/brand/logo-badge.jpg`],
           },
           unit_amount: netServiceAmountCents,

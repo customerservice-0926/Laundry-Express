@@ -8,6 +8,7 @@ import type { CouponItem } from "@/lib/services/coupon-service";
 export interface CheckoutPayload {
   currentUser: User | null;
   pricingMode: PricingMode;
+  packageId?: string;
   bagCount: number;
   weightLbs?: number;
   selectedDetergentId: string;
@@ -45,6 +46,7 @@ export function useBookingCheckout() {
           customer_email: p.currentUser?.email || "",
           customer_phone: p.phone || p.currentUser?.phone || "",
           pricing_mode: p.pricingMode,
+          package_id: p.pricingMode === "package" ? p.packageId : undefined,
           bag_count: p.bagCount,
           estimated_weight_lbs: weightAmount,
           detergent_id: p.selectedDetergentId,

@@ -1,25 +1,13 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { PackagePlan } from "@/lib/services/pricing-plan-service";
+import { usePackagePlans } from "@/hooks/use-package-plans";
 
 export function PlanPackagesGrid() {
-  const [plans, setPlans] = React.useState<PackagePlan[]>([]);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    fetch("/api/plans")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.plans) setPlans(data.plans.filter((p: PackagePlan) => p.is_active));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { plans, isLoading: loading } = usePackagePlans();
 
   if (loading) {
     return (
@@ -88,17 +76,11 @@ export function PlanPackagesGrid() {
                 ))}
               </ul>
             </div>
-            <a
-              href="tel:815-575-9536"
-              className="mt-6 block"
-            >
+            <Link href={`/order?mode=package&package=${pkg.id}`} className="mt-6 block">
               <Button variant={isFeatured ? "hero" : "outline"} className="w-full">
-                Activate via Concierge (815) 575-9536
+                Book This Package
               </Button>
-            </a>
-            <p className="text-[10px] text-center text-slate-400 mt-2">
-              Pre-paid bundles are activated on customer accounts via concierge support.
-            </p>
+            </Link>
           </div>
         );
       })}
