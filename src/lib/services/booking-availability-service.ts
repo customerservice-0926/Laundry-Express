@@ -6,6 +6,7 @@ export interface AvailabilityCheckInput {
   pickup_slot: string;
   city: string;
   zip_code: string;
+  delivery_date?: string;
 }
 
 export function getServiceTimezone(): string {
@@ -45,8 +46,8 @@ export function getServiceNow(): { todayStr: string; currentHour: number; curren
 }
 
 /**
- * Validates delivery zone coverage, schedule cutoffs, and slot capacity.
- * Enforces business settings and fails closed if settings cannot be verified.
+ * Validates delivery zone coverage, operating schedule, closed dates, cutoffs, and slot capacity.
+ * Enforces business settings strictly and fails closed if settings cannot be verified.
  */
 export async function validateOrderAvailability(input: AvailabilityCheckInput): Promise<string | null> {
   // 1. Load operational settings (fail closed on failure)
@@ -80,21 +81,70 @@ export async function validateOrderAvailability(input: AvailabilityCheckInput): 
     return `We do not currently service ${input.city} (${input.zip_code}). Please choose a supported delivery area.`;
   }
 
-  // 2. Schedule and Same-Day Cutoff Validation in Service Timezone (America/Chicago)
-  const { todayStr, currentHour } = getServiceNow();
+  // 2. Pickup Date Normalization & Strict Format Validation
+  const pickupDate = input.pickup_date?.trim();
+  if (!pickupDate || !/^\d{4}-\d{2}-\d{2}$/.test(pickupDate)) {
+    return "Please enter a valid pickup date (YYYY-MM-DD).";
+  }
 
-  if (input.pickup_date < todayStr) {
+  const { todayStr, currentHour } = getServiceNow();
+  if (pickupDate < todayStr) {
     return "Pickup date cannot be in the past.";
   }
 
-  if (input.pickup_date === todayStr) {
+  // Weekly Operating Days Validation
+  const operatingDays = Array.isArray(settings.operating_days) ? settings.operating_days : [];
+  const formattedDays = operatingDays
+    .map((name) => name.charAt(0).toUpperCase() + name.slice(1))
+    .join(", ");
+
+  const [y, m, d] = pickupDate.split("-").map(Number);
+  const pickupDateObj = new Date(Date.UTC(y, (m || 1) - 1, d || 1, 12, 0, 0));
+  const dayNameLower = pickupDateObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }).toLowerCase();
+  const dayNameFull = pickupDateObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+
+  if (!operatingDays.includes(dayNameLower)) {
+    return `Laundry pickup is closed on ${dayNameFull}s. We operate on: ${formattedDays}.`;
+  }
+
+  // Scheduled Closure Dates Validation
+  const closedDates = Array.isArray(settings.closed_dates)
+    ? settings.closed_dates.map((item) => String(item).trim())
+    : [];
+
+  if (closedDates.includes(pickupDate)) {
+    return `Laundry pickup is closed on ${pickupDate} for a scheduled closure. Please choose an open date.`;
+  }
+
+  // Optional Drop-off / Delivery Date Validation
+  if (input.delivery_date) {
+    const deliveryDate = input.delivery_date.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
+      return "Please enter a valid delivery date (YYYY-MM-DD).";
+    }
+    if (deliveryDate < pickupDate) {
+      return "Drop-off date cannot be earlier than pickup date.";
+    }
+    if (closedDates.includes(deliveryDate)) {
+      return `Laundry delivery is closed on ${deliveryDate} for a scheduled closure. Please choose an open date.`;
+    }
+    const [dy, dm, dd] = deliveryDate.split("-").map(Number);
+    const dropoffObj = new Date(Date.UTC(dy, (dm || 1) - 1, dd || 1, 12, 0, 0));
+    const dropoffDayLower = dropoffObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }).toLowerCase();
+    const dropoffDayFull = dropoffObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+    if (!operatingDays.includes(dropoffDayLower)) {
+      return `Laundry delivery is closed on ${dropoffDayFull}s. We operate on: ${formattedDays}.`;
+    }
+  }
+
+  // Same-Day Pickup Window Cutoff Validation
+  if (pickupDate === todayStr) {
     let cutoffHour = 12;
     if (input.pickup_slot === "8am-12pm") {
       cutoffHour = parseHour(settings.slot1_end) ?? 12;
     } else if (input.pickup_slot === "1pm-6pm") {
       cutoffHour = parseHour(settings.slot2_end) ?? 18;
     }
-
     if (currentHour >= cutoffHour) {
       return `The ${input.pickup_slot} pickup window for today is closed. Please choose a future date or window.`;
     }
@@ -110,7 +160,7 @@ export async function validateOrderAvailability(input: AvailabilityCheckInput): 
   const { count, error } = await supabase
     .from("orders")
     .select("id", { count: "exact", head: true })
-    .eq("pickup_date", input.pickup_date)
+    .eq("pickup_date", pickupDate)
     .eq("pickup_time_slot", input.pickup_slot)
     .neq("order_status", "cancelled");
 
@@ -119,7 +169,7 @@ export async function validateOrderAvailability(input: AvailabilityCheckInput): 
   }
 
   if (typeof count === "number" && count >= slotCapacity) {
-    return `The selected pickup window is fully booked for ${input.pickup_date}. Please choose another slot.`;
+    return `The selected pickup window is fully booked for ${pickupDate}. Please choose another slot.`;
   }
 
   return null;

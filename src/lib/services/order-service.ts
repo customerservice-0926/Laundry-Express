@@ -49,6 +49,10 @@ export class OrderService {
   static async createOrder(payload: Partial<Order>): Promise<Order> {
     if (!payload.detergent_id) throw new Error("A detergent selection is required.");
     const settings = await ContentService.getSettings();
+    const pickupDate = payload.pickup_date?.trim();
+    if (pickupDate && Array.isArray(settings?.closed_dates) && settings.closed_dates.includes(pickupDate)) {
+      throw new Error(`Laundry service is closed on pickup date ${pickupDate}.`);
+    }
     const slotCapacity = settings?.max_orders_per_slot;
     if (typeof slotCapacity !== "number" || !Number.isInteger(slotCapacity) || slotCapacity < 1) {
       throw new Error("Pickup capacity is not configured.");

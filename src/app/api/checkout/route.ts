@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       pickup_slot: body.pickup_slot,
       city: body.city,
       zip_code: body.zip_code,
+      delivery_date: typeof body.delivery_date === "string" ? body.delivery_date : undefined,
     });
     if (availabilityError) return NextResponse.json({ success: false, error: availabilityError }, { status: 400 });
 
