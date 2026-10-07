@@ -54,7 +54,7 @@ export function MascotBadge({
           )}
         >
           <Image
-            src="/brand/logo-badge.jpg"
+            src="/brand/logo-badge.jpeg"
             alt="Laundry Express Bubble Superhero Mascot"
             width={dimensions[size].width}
             height={dimensions[size].height}

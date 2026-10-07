@@ -6,6 +6,7 @@ import { Footer } from "@/components/shared/footer";
 import { Button } from "@/components/ui/button";
 import { APP_CONFIG } from "@/lib/constants";
 import { ContentService } from "@/lib/services/content-service";
+import { getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo/jsonld-schemas";
 
 export const metadata: Metadata = {
   title: "Terms of Service & Guarantees — Laundry Express",
@@ -19,17 +20,31 @@ export const metadata: Metadata = {
     description: "Official customer satisfaction guarantees, safe garment policies, and service terms.",
     url: `${APP_CONFIG.url}/terms`,
     siteName: "Laundry Express",
-    images: [{ url: "/brand/logo-badge.jpg", width: 1200, height: 630, alt: "Laundry Express Terms" }],
+    images: [{ url: "/brand/logo-badge.jpeg", width: 1200, height: 630, alt: "Laundry Express Terms", type: "image/jpeg" }],
     locale: "en_US",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Terms of Service & Guarantees — Laundry Express",
+    description: "Official customer satisfaction guarantees, safe garment policies, and service terms.",
+    images: ["/brand/logo-badge.jpeg"],
   },
 };
 
 export default async function TermsPage() {
   const terms = await ContentService.getTerms();
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Terms & Guarantees", path: "/terms" },
+  ]);
 
   return (
     <div className="min-h-screen flex flex-col bg-white overflow-x-clip">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
+      />
       <Navbar />
 
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28 pb-16 space-y-10 sm:space-y-12">

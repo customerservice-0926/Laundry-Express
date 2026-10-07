@@ -68,11 +68,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/brand/mascot-bubble-hero.jpg", type: "image/jpeg" },
-      { url: "/brand/mascot-bubble-hero.jpg", sizes: "any" },
+      { url: "/brand/mascot-bubble-hero.jpeg", type: "image/jpeg" },
+      { url: "/brand/mascot-bubble-hero.jpeg", sizes: "any" },
     ],
-    shortcut: "/brand/mascot-bubble-hero.jpg",
-    apple: "/brand/mascot-bubble-hero.jpg",
+    shortcut: "/brand/mascot-bubble-hero.jpeg",
+    apple: "/brand/mascot-bubble-hero.jpeg",
   },
   openGraph: {
     type: "website",
@@ -83,7 +83,7 @@ export const metadata: Metadata = {
       "Review laundry pickup and wash-and-fold services, current plans, and delivery coverage in Lake in the Hills, Illinois.",
     images: [
       {
-        url: "/brand/mascot-bubble-hero.jpg",
+        url: "/brand/mascot-bubble-hero.jpeg",
         width: 1200,
         height: 630,
         alt: "Laundry Express Superhero Laundry",
@@ -95,7 +95,7 @@ export const metadata: Metadata = {
     title: "Laundry Express | Doorstep Laundry Pickup & Wash-and-Fold",
     description:
       "Review laundry pickup and wash-and-fold services, current plans, and delivery coverage in Lake in the Hills, Illinois.",
-    images: ["/brand/mascot-bubble-hero.jpg"],
+    images: ["/brand/mascot-bubble-hero.jpeg"],
   },
   robots: {
     index: true,
@@ -118,7 +118,7 @@ const jsonLd = {
   url: APP_CONFIG.url,
   telephone: APP_CONFIG.supportPhone,
   email: APP_CONFIG.supportEmail,
-  image: `${APP_CONFIG.url}/brand/logo-badge.jpg`,
+  image: `${APP_CONFIG.url}/brand/logo-badge.jpeg`,
   priceRange: "$$",
   address: {
     "@type": "PostalAddress",

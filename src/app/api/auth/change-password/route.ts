@@ -17,10 +17,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { email, otp, newPassword } = body;
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid JSON payload is required." }, { status: 400 });
+    }
+    const { email, otp, newPassword } = body as Record<string, unknown>;
 
-    if (!email || !otp || !newPassword) {
+    if (typeof email !== "string" || typeof otp !== "string" || typeof newPassword !== "string" || !email.trim() || !otp.trim()) {
       return NextResponse.json(
         { success: false, error: "Email, verification OTP, and new password are required." },
         { status: 400 }

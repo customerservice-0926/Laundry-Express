@@ -98,10 +98,10 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
     content: invoicePdf,
     contentType: "application/pdf",
   };
-  const logoPath = path.join(process.cwd(), "public", "brand", "logo-badge.jpg");
+  const logoPath = path.join(process.cwd(), "public", "brand", "logo-badge.jpeg");
   const logoAttachment = fs.existsSync(logoPath)
     ? {
-        filename: "logo-badge.jpg",
+        filename: "logo-badge.jpeg",
         path: logoPath,
         cid: "brand-logo-badge",
       }

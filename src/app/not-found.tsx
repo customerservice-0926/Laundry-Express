@@ -26,7 +26,7 @@ export default function NotFound() {
           {/* Mascot Brand Illustration */}
           <div className="relative mx-auto w-32 h-32 sm:w-40 sm:h-40 rounded-3xl overflow-hidden shadow-xl shadow-pink-500/10 border-4 border-white bg-white ring-8 ring-pink-100/50">
             <Image
-              src="/brand/hero.jpg"
+              src="/brand/hero.jpeg"
               alt="Laundry Express Superhero Mascot"
               fill
               sizes="(max-width: 640px) 128px, 160px"

@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
   const guard = await requireAdmin(req);
   if (guard) return guard;
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid detergent payload is required." }, { status: 400 });
+    }
     const saved = await CatalogService.saveDetergent(body);
     return NextResponse.json({ success: true, item: saved });
   } catch (error: unknown) {
@@ -40,7 +43,10 @@ export async function PATCH(req: NextRequest) {
   const guard = await requireAdmin(req);
   if (guard) return guard;
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid detergent payload is required." }, { status: 400 });
+    }
     const saved = await CatalogService.saveDetergent(body);
     return NextResponse.json({ success: true, item: saved });
   } catch (error: unknown) {

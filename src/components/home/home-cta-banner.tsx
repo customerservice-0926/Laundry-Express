@@ -191,7 +191,7 @@ export function HomeCtaBanner() {
                 <div className="relative h-60 w-60 sm:h-72 sm:w-72 rounded-3xl bg-white/5 border border-white/15 backdrop-blur-md shadow-2xl flex items-center justify-center p-4 group cursor-pointer transition-all duration-300 hover:border-primary/50 hover:shadow-[0_0_40px_var(--primary-ghost)]">
                   <div className="relative w-full h-full transition-transform duration-500 group-hover:scale-110">
                     <Image
-                      src="/brand/logo.jpg"
+                      src="/brand/logo.jpeg"
                       alt="Laundry Express Official Logo"
                       fill
                       sizes="(max-width: 640px) 240px, 288px"

@@ -17,8 +17,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { email, purpose } = body;
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid JSON payload is required." }, { status: 400 });
+    }
+    const { email, purpose } = body as Record<string, unknown>;
 
     if (!email || typeof email !== "string") {
       return NextResponse.json(

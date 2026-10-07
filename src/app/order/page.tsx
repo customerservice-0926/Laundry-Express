@@ -8,26 +8,39 @@ import { Sparkles, ShieldCheck, Truck } from "lucide-react";
 import { APP_CONFIG } from "@/lib/constants";
 import { PricingPlanService } from "@/lib/services/pricing-plan-service";
 import { SlotChip } from "@/components/order/slot-chip";
+import { getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo/jsonld-schemas";
 
 export const metadata: Metadata = {
-  title: "Book Laundry Pickup & Pay — Fast Checkout",
+  title: "Book Laundry Pickup & Pay — Fast Checkout | Laundry Express",
   description:
-    "Schedule a laundry pickup, provide your service details, and continue to secure checkout.",
+    "Schedule doorstep laundry pickup, choose detergent, select your preferred window, and complete secure 24-hour wash and fold checkout.",
   alternates: {
     canonical: "/order",
   },
   robots: {
-    index: false,
-    follow: false,
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   openGraph: {
     title: "Laundry Express — Book Pickup & Stripe Checkout",
     description: "Schedule a laundry pickup and continue to secure checkout.",
     url: `${APP_CONFIG.url}/order`,
     siteName: "Laundry Express",
-    images: [{ url: "/brand/logo-badge.jpg", width: 1200, height: 630, alt: "Laundry Express Checkout" }],
+    images: [{ url: "/brand/logo-badge.jpeg", width: 1200, height: 630, alt: "Laundry Express Checkout", type: "image/jpeg" }],
     locale: "en_US",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Book Laundry Pickup & Pay — Laundry Express",
+    description: "Schedule 24-hour turnaround wash & fold laundry service with contactless doorstep pickup.",
+    images: ["/brand/logo-badge.jpeg"],
   },
 };
 
@@ -49,9 +62,17 @@ function OrderLoadingSkeleton() {
 
 export default async function OrderPage() {
   const initialPricing = await PricingPlanService.getPricing().catch(() => null);
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Book Laundry Pickup", path: "/order" },
+  ]);
 
   return (
     <div className="min-h-screen flex flex-col bg-white overflow-x-clip pt-8 md:pt-10">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
+      />
       {/* Sticky Global Navigation Navbar */}
       <Navbar />
 

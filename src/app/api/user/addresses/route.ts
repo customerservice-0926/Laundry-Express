@@ -22,7 +22,10 @@ export async function POST(req: NextRequest) {
     if (!verified) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid address payload is required." }, { status: 400 });
+    }
     const saved = await AddressService.saveAddress({
       ...body,
       user_id: verified.user.id,

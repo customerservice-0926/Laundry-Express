@@ -8,13 +8,16 @@ import { consumeRateLimit } from "@/lib/security/rate-limit";
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { email, otp, purpose } = body;
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid JSON payload is required." }, { status: 400 });
+    }
+    const { email, otp, purpose } = body as Record<string, unknown>;
     if (typeof email === "string" && !await consumeRateLimit(req, "otp-verify", 10, 60, email)) {
       return NextResponse.json({ success: false, error: "Too many verification attempts. Please wait." }, { status: 429 });
     }
 
-    if (!email || !otp || !purpose) {
+    if (typeof email !== "string" || typeof otp !== "string" || typeof purpose !== "string" || !email.trim() || !otp.trim()) {
       return NextResponse.json(
         { success: false, error: "Email, 6-digit code, and purpose are required." },
         { status: 400 }

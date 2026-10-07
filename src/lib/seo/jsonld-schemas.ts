@@ -54,6 +54,57 @@ export function getFaqSchema(faqs: FaqItem[] = []) {
 }
 
 /**
+ * Generates BreadcrumbList Schema for structured navigation trails in Google SERP.
+ */
+export function getBreadcrumbSchema(items: Array<{ name: string; path: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((crumb, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      name: crumb.name,
+      item: crumb.path.startsWith("http") ? crumb.path : `${APP_CONFIG.url.replace(/\/$/, "")}${crumb.path}`,
+    })),
+  };
+}
+
+/**
+ * Generates Service Schema for Laundry Express Wash & Fold services.
+ */
+export function getServiceSchema() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    serviceType: "Wash & Fold Laundry Pickup Service",
+    provider: {
+      "@type": "DryCleaningOrLaundryService",
+      name: APP_CONFIG.name,
+      url: APP_CONFIG.url,
+      telephone: APP_CONFIG.supportPhone,
+    },
+    areaServed: {
+      "@type": "Place",
+      name: "Lake in the Hills, IL & surrounding suburbs",
+    },
+    hasOfferCatalog: {
+      "@type": "OfferCatalog",
+      name: "Laundry Services",
+      itemListElement: [
+        {
+          "@type": "Offer",
+          itemOffered: { "@type": "Service", name: "13-Gallon Bag Wash & Fold" },
+        },
+        {
+          "@type": "Offer",
+          itemOffered: { "@type": "Service", name: "By-The-Pound Wash & Fold" },
+        },
+      ],
+    },
+  };
+}
+
+/**
  * Safely serializes JSON-LD objects for HTML script tags.
  * Escapes '<', '>', and '&' to unicode escape sequences to prevent script breakout / injection.
  */
@@ -63,3 +114,4 @@ export function serializeJsonLd(data: unknown): string {
     .replace(/>/g, "\\u003e")
     .replace(/&/g, "\\u0026");
 }
+

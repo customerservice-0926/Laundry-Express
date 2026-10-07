@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
           product_data: {
             name: `Laundry Express — ${pkg ? pkg.name : createdOrder.pricing_mode === "per_bag" ? "By The Bag Wash & Fold" : "By The Pound (lb)"}`,
             description: `${createdOrder.pricing_mode === "per_lb" || pkg?.unit_type === "lb" ? `${createdOrder.estimated_weight_lbs} lbs` : `${createdOrder.bag_count} Bag(s)`} • Cold Water Gentle Care • 24hr Return`,
-            images: [`${origin}/brand/logo-badge.jpg`],
+            images: [`${origin}/brand/logo-badge.jpeg`],
           },
           unit_amount: netServiceAmountCents,
         },

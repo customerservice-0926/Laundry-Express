@@ -54,7 +54,7 @@ export function ForgotPasswordView() {
       <div className="text-center space-y-3">
         <div className="relative h-16 w-16 mx-auto rounded-2xl overflow-hidden shadow-sm border border-slate-100">
           <Image
-            src="/brand/logo-badge.jpg"
+            src="/brand/logo-badge.jpeg"
             alt="Laundry Express Logo"
             fill
             sizes="64px"

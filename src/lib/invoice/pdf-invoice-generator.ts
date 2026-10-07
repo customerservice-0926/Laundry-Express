@@ -9,7 +9,7 @@ function getLogoBase64(): string | null {
     const fs = require("node:fs");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const path = require("node:path");
-    const p = path.join(process.cwd(), "public", "brand", "logo-badge.jpg");
+    const p = path.join(process.cwd(), "public", "brand", "logo-badge.jpeg");
     if (fs.existsSync(p)) return `data:image/jpeg;base64,${fs.readFileSync(p).toString("base64")}`;
   } catch {}
   return null;
@@ -201,7 +201,7 @@ export async function downloadInvoiceAsPdf(invoice: UnifiedInvoiceInput, filenam
   let logoDataUri: string | null = null;
   if (typeof window !== "undefined") {
     try {
-      const resp = await fetch("/brand/logo-badge.jpg");
+      const resp = await fetch("/brand/logo-badge.jpeg");
       const blob = await resp.blob();
       logoDataUri = await new Promise((resolve) => {
         const reader = new FileReader();

@@ -28,7 +28,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Please sign in to leave a review." }, { status: 401 });
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid review payload is required." }, { status: 400 });
+    }
     const result = await ReviewService.submitReview({
       ...body,
       userId: verified.user.id,
@@ -53,12 +56,19 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized. Admin role required." }, { status: 403 });
     }
 
-    const { reviewId, status } = await req.json();
-    if (!reviewId || !status) {
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid JSON payload is required." }, { status: 400 });
+    }
+    const { reviewId, status } = body as Record<string, unknown>;
+    if (!reviewId || !status || typeof reviewId !== "string" || typeof status !== "string") {
       return NextResponse.json({ success: false, error: "Review ID and status are required." }, { status: 400 });
     }
+    if (!["pending", "approved", "rejected"].includes(status)) {
+      return NextResponse.json({ success: false, error: "Status must be pending, approved, or rejected." }, { status: 400 });
+    }
 
-    await ReviewService.updateReviewStatus(reviewId, status);
+    await ReviewService.updateReviewStatus(reviewId, status as "pending" | "approved" | "rejected");
     return NextResponse.json({ success: true, message: "Review status updated." });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update review";

@@ -33,7 +33,10 @@ export async function POST(req: NextRequest) {
   const guard = await requireAdmin(req);
   if (guard) return guard;
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid coupon payload is required." }, { status: 400 });
+    }
     const saved = await CouponService.saveCoupon(body);
     return NextResponse.json({ success: true, coupon: saved }, { status: 201 });
   } catch (error: unknown) {
@@ -46,7 +49,10 @@ export async function PATCH(req: NextRequest) {
   const guard = await requireAdmin(req);
   if (guard) return guard;
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid coupon payload is required." }, { status: 400 });
+    }
     const saved = await CouponService.saveCoupon(body);
     return NextResponse.json({ success: true, coupon: saved });
   } catch (error: unknown) {

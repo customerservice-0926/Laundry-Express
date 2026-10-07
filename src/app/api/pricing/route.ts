@@ -21,7 +21,10 @@ export async function PUT(req: NextRequest) {
     if (!verified || verified.user.role !== "admin") {
       return NextResponse.json({ success: false, error: "Unauthorized. Admin role required." }, { status: 403 });
     }
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid pricing payload is required." }, { status: 400 });
+    }
     const updated = await PricingPlanService.updatePricing(body);
     return NextResponse.json({ success: true, pricing: updated }, { status: 200 });
   } catch (error: unknown) {

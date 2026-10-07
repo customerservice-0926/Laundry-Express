@@ -25,10 +25,11 @@ export const metadata: Metadata = {
     siteName: "Laundry Express",
     images: [
       {
-        url: "/brand/logo-badge.jpg",
+        url: "/brand/logo-badge.jpeg",
         width: 1200,
         height: 630,
         alt: "Laundry Express Registration",
+        type: "image/jpeg",
       },
     ],
     locale: "en_US",
