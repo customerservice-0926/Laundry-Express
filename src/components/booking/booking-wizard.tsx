@@ -220,7 +220,7 @@ export function BookingWizard({
               <StepReview pricingMode={pricingMode} bagCount={boundedBagCount} weightLbs={boundedWeightLbs} packageName={selectedPackage?.name} packageCapacity={selectedPackage?.capacity} packageUnit={selectedPackage?.unit_type} selectedDetergentId={selectedDetergentId} selectedDate={selectedDate} selectedSlot={selectedSlot} address={address} phone={phoneValue} isOutOfHome={isOutOfHome} slot1Start={settings.slot1Start} slot1End={settings.slot1End} slot2Start={settings.slot2Start} slot2End={settings.slot2End} onEditStep={setStep} onBack={() => setStep(4)} onContinue={() => setStep(6)} />
             )}
             {step === 6 && (
-              <StepPayment priceResult={priceResult} promoCode={promoCode} onPromoCodeChange={setPromoCode} onApplyPromo={handleApplyPromo} promoError={promoError} paymentMethod={paymentMethod} onSelectPaymentMethod={setPaymentMethod} isProcessing={isProcessing} onConfirm={handleConfirm} onBack={() => setStep(5)} />
+              <StepPayment pricingMode={pricingMode} priceResult={priceResult} promoCode={promoCode} onPromoCodeChange={setPromoCode} onApplyPromo={handleApplyPromo} promoError={promoError} paymentMethod={paymentMethod} onSelectPaymentMethod={setPaymentMethod} isProcessing={isProcessing} onConfirm={handleConfirm} onBack={() => setStep(5)} />
             )}
           </div>
           <div className="lg:col-span-1">

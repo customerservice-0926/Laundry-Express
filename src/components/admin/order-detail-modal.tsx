@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import {
-  User, Phone, Mail, MapPin, Sparkles, CreditCard, Camera, AlertTriangle, CheckCircle2, Calendar,
+  User, Phone, Mail, MapPin, Sparkles, CreditCard, Camera, AlertTriangle, CheckCircle2, Calendar, Scale,
 } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
 import { ORDER_STATUSES } from "@/lib/constants";
@@ -18,6 +18,7 @@ interface OrderDetailModalProps {
   onClose: () => void;
   onUpdateStatus?: (orderId: string, newStatus: OrderStatus, reason?: string, notes?: string) => Promise<boolean>;
   onOpenProofModal?: (order: Order, type: "pickup" | "dropoff" | "damage") => void;
+  onWeighOrder?: (order: Order) => void;
   allOrders?: Order[];
 }
 
@@ -27,6 +28,7 @@ export function OrderDetailModal({
   onClose,
   onUpdateStatus,
   onOpenProofModal,
+  onWeighOrder,
   allOrders = [],
 }: OrderDetailModalProps) {
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
@@ -40,17 +42,15 @@ export function OrderDetailModal({
   const lifetimeSpent = userPastOrders.reduce((sum, o) => sum + o.total_amount, 0) || order.total_amount;
   const fullOrderAddress = [order.street_address, order.apt_unit ? `Apt ${order.apt_unit}` : "", order.city, order.state, order.zip_code].filter(Boolean).join(", ") || order.pickup_address || order.user?.address || "Address pending";
   const acceptOrder = async () => {
-    if (!onUpdateStatus) return;
     setIsUpdatingStatus(true); setStatusError("");
-    const updated = await onUpdateStatus(order.id, "driver_assigned");
+    const ok = onUpdateStatus ? await onUpdateStatus(order.id, "driver_assigned") : false;
     setIsUpdatingStatus(false);
-    if (updated) onClose(); else setStatusError("The order was not updated. Please review the error and try again.");
+    if (ok) onClose(); else setStatusError("The order was not updated. Please try again.");
   };
   const cancelOrder = async (reason?: string, notes?: string) => {
-    if (!onUpdateStatus) return false;
-    const updated = await onUpdateStatus(order.id, "cancelled", reason, notes);
-    if (updated) onClose();
-    return updated;
+    const ok = onUpdateStatus ? await onUpdateStatus(order.id, "cancelled", reason, notes) : false;
+    if (ok) onClose();
+    return ok;
   };
 
   return (
@@ -222,6 +222,11 @@ export function OrderDetailModal({
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
           <Button variant="outline" size="sm" onClick={onClose}>Close Inspection</Button>
           <div className="flex items-center gap-2">
+            {order.pricing_mode === "per_lb" && order.payment_status !== "paid" && order.order_status !== "completed" && order.order_status !== "cancelled" && onWeighOrder && (
+              <Button variant="hero" size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => { onClose(); onWeighOrder(order); }}>
+                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Weigh &amp; Charge
+              </Button>
+            )}
             {onOpenProofModal && order.order_status === "in_wash" && (
               <Button variant="outline" size="sm" className="text-rose-600 border-rose-200 hover:bg-rose-50" onClick={() => { onClose(); onOpenProofModal(order, "damage"); }}>
                 <AlertTriangle className="h-3.5 w-3.5 mr-1 shrink-0" /> Report Damage

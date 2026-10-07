@@ -77,6 +77,12 @@ export function OrderSummaryCard({
         <span className="text-xs text-slate-500 font-medium">Estimated Total</span>
         <span className="text-2xl font-black text-slate-900 tracking-tight">{formatCurrency(total_amount)}</span>
       </div>
+      {pricingMode === "per_lb" && (
+        <div className="p-2 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 font-semibold flex items-center justify-between">
+          <span>Due Today:</span>
+          <span className="font-extrabold text-amber-900">$0.00 (Card Authorized)</span>
+        </div>
+      )}
 
       <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
         <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />

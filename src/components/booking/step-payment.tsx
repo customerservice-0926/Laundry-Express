@@ -5,8 +5,11 @@ import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { CalculatedPriceResult } from "@/lib/stripe/pricing-calc";
 
+import type { PricingMode } from "@/types";
+
 interface StepPaymentProps {
   priceResult: CalculatedPriceResult;
+  pricingMode?: PricingMode;
   promoCode: string;
   onPromoCodeChange: (code: string) => void;
   onApplyPromo: () => void;
@@ -20,6 +23,7 @@ interface StepPaymentProps {
 
 export function StepPayment({
   priceResult,
+  pricingMode = "per_bag",
   promoCode,
   onPromoCodeChange,
   onApplyPromo,
@@ -72,9 +76,15 @@ export function StepPayment({
             </div>
           )}
           <div className="flex justify-between font-black text-slate-900 text-sm border-t border-slate-200 pt-2 mt-1">
-            <span>Total Payable</span>
+            <span>{pricingMode === "per_lb" ? "Est. Total (Pay After Weighing)" : "Total Payable"}</span>
             <span className="text-base text-primary font-black">{formatCurrency(total_amount)}</span>
           </div>
+          {pricingMode === "per_lb" && (
+            <div className="flex justify-between font-bold text-emerald-700 text-xs bg-emerald-50 p-2 rounded-xl border border-emerald-200">
+              <span>Amount Charged Today:</span>
+              <span className="font-black">$0.00 (Card Authorization Only)</span>
+            </div>
+          )}
         </div>
 
         {/* Promo Code */}
@@ -107,7 +117,7 @@ export function StepPayment({
         </div>
 
         {/* Stripe Checkout Card */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-pink-50/30 border border-slate-200 space-y-3">
+        <div className="p-4 rounded-2xl bg-linear-to-br from-slate-50 to-pink-50/30 border border-slate-200 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-black text-xs">
@@ -128,7 +138,9 @@ export function StepPayment({
           </div>
 
           <p className="text-xs text-slate-600 leading-relaxed">
-            You will be redirected to Stripe’s secure hosted checkout page to complete your payment with your preferred method. Your card details are never stored on our servers.
+            {pricingMode === "per_lb"
+              ? "You will securely save your card with Stripe ($0.00 charged today). Your card will only be charged after your clothes are measured on a scale upon pickup."
+              : "You will be redirected to Stripe’s secure hosted checkout page to complete your payment with your preferred method. Your card details are never stored on our servers."}
           </p>
 
           <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-semibold text-slate-500">
@@ -155,6 +167,10 @@ export function StepPayment({
           {isProcessing ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Redirecting to Stripe...
+            </>
+          ) : pricingMode === "per_lb" ? (
+            <>
+              Authorize Card &amp; Confirm Booking ($0.00 Today) <ArrowRight className="h-4 w-4 ml-2" />
             </>
           ) : (
             <>

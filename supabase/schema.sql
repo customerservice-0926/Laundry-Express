@@ -153,6 +153,10 @@ CREATE INDEX IF NOT EXISTS idx_orders_pickup_slot_status
     ON public.orders(pickup_date, pickup_time_slot, order_status);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS invoice_email_sent_at TIMESTAMPTZ;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS stripe_checkout_session_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS stripe_payment_method_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS card_brand TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS card_last4 TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS estimated_weight_lbs NUMERIC(10,2) DEFAULT 0;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS final_weight_lbs NUMERIC(10,2);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS detergent_fee NUMERIC(10,2) NOT NULL DEFAULT 0;

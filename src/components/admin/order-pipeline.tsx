@@ -8,6 +8,7 @@ import { OrderTableRow } from "./order-table-row";
 import { OrderCard } from "./order-card";
 import { OrderDetailModal } from "./order-detail-modal";
 import { OrderProofModal } from "./order-proof-modal";
+import { OrderWeighModal } from "./order-weigh-modal";
 
 interface OrderPipelineProps {
   orders: Order[];
@@ -22,6 +23,7 @@ export function OrderPipeline({
 }: OrderPipelineProps) {
   const [selectedOrder, setSelectedOrder] = React.useState<Order | null>(null);
   const [detailOrderId, setDetailOrderId] = React.useState<string | null>(null);
+  const [weighOrder, setWeighOrder] = React.useState<Order | null>(null);
   const [proofType, setProofType] = React.useState<"pickup" | "dropoff" | "damage">("pickup");
   const [proofModalOpen, setProofModalOpen] = React.useState<boolean>(false);
   const [systemAlert, setSystemAlert] = React.useState<string | null>(null);
@@ -175,6 +177,7 @@ export function OrderPipeline({
                 onUpdateStatus={handleStatusChangeWithNotification}
                 onOpenProofModal={handleOpenProofModal}
                 onViewDetails={(o) => setDetailOrderId(o.id)}
+                onWeighOrder={(o) => setWeighOrder(o)}
               />
             ))}
           </tbody>
@@ -190,6 +193,7 @@ export function OrderPipeline({
             onUpdateStatus={handleStatusChangeWithNotification}
             onOpenProofModal={handleOpenProofModal}
             onViewDetails={(o) => setDetailOrderId(o.id)}
+            onWeighOrder={(o) => setWeighOrder(o)}
           />
         ))}
       </div>
@@ -203,7 +207,16 @@ export function OrderPipeline({
         onSkip={handleSkipProof}
       />
 
-      <OrderDetailModal order={detailOrder} isOpen={!!detailOrder} onClose={() => setDetailOrderId(null)} onUpdateStatus={handleStatusChangeWithNotification} onOpenProofModal={handleOpenProofModal} allOrders={orders} />
+      <OrderWeighModal
+        order={weighOrder}
+        isOpen={!!weighOrder}
+        onClose={() => setWeighOrder(null)}
+        onSuccess={(updated) => {
+          triggerAlert(`Scale weight recorded for ${updated.order_number}! Customer charged.`);
+        }}
+      />
+
+      <OrderDetailModal order={detailOrder} isOpen={!!detailOrder} onClose={() => setDetailOrderId(null)} onUpdateStatus={handleStatusChangeWithNotification} onOpenProofModal={handleOpenProofModal} onWeighOrder={(o) => setWeighOrder(o)} allOrders={orders} />
     </div>
   );
 }
