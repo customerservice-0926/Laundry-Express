@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
     tax_amount NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     total_amount NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     order_status TEXT NOT NULL DEFAULT 'received' CHECK (order_status IN ('received', 'driver_assigned', 'picked_up', 'in_washing', 'out_for_delivery', 'delivered', 'cancelled')),
-    payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
+    payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'authorized', 'paid', 'failed', 'refunded')),
     payment_method TEXT NOT NULL DEFAULT 'credit_card',
     stripe_payment_intent_id TEXT,
     created_at TIMESTAMPTZ DEFAULT now(),

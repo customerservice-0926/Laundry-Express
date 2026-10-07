@@ -21,7 +21,7 @@ export class OrderBillingService {
    */
   static async recordCardAuthorized(orderId: string, details: CardAuthDetails): Promise<Order | null> {
     const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("orders")
       .update({
         stripe_customer_id: details.stripeCustomerId,
@@ -35,6 +35,26 @@ export class OrderBillingService {
       .eq("id", orderId)
       .select("*, proofs:order_proofs(*)")
       .maybeSingle();
+
+    // If database check constraint on payment_status does not yet permit 'authorized' (code 23514), fallback to storing card with payment_status preserved
+    if (error && error.code === "23514") {
+      console.warn("[billing-service] orders_payment_status_check missing 'authorized', persisting card with pending payment_status");
+      const fallback = await supabase
+        .from("orders")
+        .update({
+          stripe_customer_id: details.stripeCustomerId,
+          stripe_payment_method_id: details.stripePaymentMethodId,
+          card_brand: details.cardBrand || "card",
+          card_last4: details.cardLast4 || "",
+          order_status: "confirmed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId)
+        .select("*, proofs:order_proofs(*)")
+        .maybeSingle();
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error || !data) {
       console.error("[billing-service] Failed to record card authorization:", error);

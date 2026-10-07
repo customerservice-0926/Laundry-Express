@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const isPaidOrAuthorized = order.payment_status === "paid" || order.payment_status === "authorized";
+    const isPaidOrAuthorized = order.payment_status === "paid" || order.payment_status === "authorized" || (order.pricing_mode === "per_lb" && Boolean(order.stripe_payment_method_id));
     return NextResponse.json({ success: true, paid: isPaidOrAuthorized, order, customerName: order.customer_name, customerEmail: order.customer_email });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to retrieve order";

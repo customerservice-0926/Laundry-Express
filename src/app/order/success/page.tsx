@@ -46,7 +46,7 @@ function SuccessContent() {
       if (!response.ok || !data?.success || !data.order) throw new Error(data?.error || "Unable to retrieve order.");
       setOrder(data.order);
       const isOrderPaid = data.order.payment_status === "paid";
-      const isOrderAuthorized = data.order.payment_status === "authorized";
+      const isOrderAuthorized = data.order.payment_status === "authorized" || (data.order.pricing_mode === "per_lb" && Boolean(data.order.stripe_payment_method_id));
       setPaid(isOrderPaid || isOrderAuthorized);
       setStatusError("");
       if (isOrderPaid || isOrderAuthorized || data.order.payment_status === "failed") {
