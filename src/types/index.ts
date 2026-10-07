@@ -135,6 +135,8 @@ export interface Order {
   order_status: OrderStatus;
   stripe_customer_id?: string;
   stripe_payment_method_id?: string;
+  card_brand?: string;
+  card_last4?: string;
   stripe_payment_intent?: string;
   has_preexisting_damage?: boolean;
   damage_notes?: string;

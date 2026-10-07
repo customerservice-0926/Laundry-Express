@@ -21,7 +21,7 @@ export const metadata: Metadata = {
       "Compare transparent wash-and-fold pricing options, 13-gallon bags, and saver packages in Lake in the Hills, IL, USA.",
     url: `${APP_CONFIG.url}/pricing`,
     siteName: "Laundry Express",
-    images: [{ url: "/brand/logo-badge.jpg", width: 1200, height: 630, alt: "Laundry Express Pricing" }],
+    images: [{ url: "/brand/logo-badge.jpeg", width: 1200, height: 630, type: "image/jpeg", alt: "Laundry Express Pricing" }],
     locale: "en_US",
     type: "website",
   },
@@ -38,12 +38,26 @@ export const metadata: Metadata = {
  */
 import { PricingPlanService } from "@/lib/services/pricing-plan-service";
 import { formatCurrency } from "@/lib/utils";
+import { getBreadcrumbSchema, getServiceSchema, serializeJsonLd } from "@/lib/seo/jsonld-schemas";
 
 export default async function PricingPage() {
   const pricing = await PricingPlanService.getPricing().catch(() => null);
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Plans & Pricing", path: "/pricing" },
+  ]);
+  const serviceSchema = getServiceSchema();
 
   return (
     <div className="min-h-screen flex flex-col bg-white overflow-x-clip pt-12 sm:pt-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(serviceSchema) }}
+      />
       {/* Sticky Global Navigation Navbar */}
       <Navbar />
 

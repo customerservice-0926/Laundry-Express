@@ -58,7 +58,7 @@ export function Navbar() {
         <div className="flex items-center justify-between h-20">
           <Link href="/" className="flex items-center gap-1 group">
             <div className="relative h-14 w-14 transition-transform group-hover:scale-95 duration-200 shrink-0">
-              <Image src="/brand/hero.jpg" alt="Laundry Express" width={80} height={80} priority />
+              <Image src="/brand/hero.jpeg" alt="Laundry Express" width={80} height={80} priority />
             </div>
             <div>
               <span className={`font-black text-xl tracking-tight ${scrolled ? "text-white" : "text-slate-900"}`}>

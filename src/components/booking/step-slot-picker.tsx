@@ -23,6 +23,8 @@ interface StepSlotPickerProps {
   slot1End: string;
   slot2Start: string;
   slot2End: string;
+  operatingDays?: string[];
+  closedDates?: string[];
   serverTime?: {
     todayStr: string;
     currentHour: number;
@@ -31,19 +33,16 @@ interface StepSlotPickerProps {
   } | null;
 }
 
-function parseHour(t?: string): number {
-  if (!t) return 0;
-  const [h] = t.split(":").map(Number);
+const parseHour = (t?: string): number => {
+  const [h] = (t || "").split(":").map(Number);
   return Number.isFinite(h) ? h : 0;
-}
+};
 
-function fmt12(t?: string): string {
+const fmt12 = (t?: string): string => {
   if (!t) return "";
   const [h, m] = t.split(":").map(Number);
-  const ampm = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 || 12;
-  return m === 0 ? `${h12}:00 ${ampm}` : `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
-}
+  return `${h % 12 || 12}:${m === 0 ? "00" : String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+};
 
 export function StepSlotPicker({
   selectedDate,
@@ -56,6 +55,8 @@ export function StepSlotPicker({
   slot1End,
   slot2Start,
   slot2End,
+  operatingDays = [],
+  closedDates = [],
   serverTime,
 }: StepSlotPickerProps) {
   const todayStr = serverTime?.todayStr || new Date().toISOString().split("T")[0];
@@ -63,20 +64,8 @@ export function StepSlotPicker({
   const isToday = selectedDate === todayStr;
 
   const slots: TimeSlot[] = [
-    {
-      id: "8am-12pm",
-      label: "Morning Pickup Window",
-      time: `${fmt12(slot1Start)} – ${fmt12(slot1End)}`,
-      startHour: parseHour(slot1Start) || 8,
-      endHour: parseHour(slot1End) || 12,
-    },
-    {
-      id: "1pm-6pm",
-      label: "Afternoon Pickup Window",
-      time: `${fmt12(slot2Start)} – ${fmt12(slot2End)}`,
-      startHour: parseHour(slot2Start) || 13,
-      endHour: parseHour(slot2End) || 18,
-    },
+    { id: "8am-12pm", label: "Morning Pickup Window", time: `${fmt12(slot1Start)} – ${fmt12(slot1End)}`, startHour: parseHour(slot1Start) || 8, endHour: parseHour(slot1End) || 12 },
+    { id: "1pm-6pm", label: "Afternoon Pickup Window", time: `${fmt12(slot2Start)} – ${fmt12(slot2End)}`, startHour: parseHour(slot2Start) || 13, endHour: parseHour(slot2End) || 18 },
   ];
 
   const isSlotDisabled = (slot: TimeSlot) => isToday && nowHour >= slot.endHour;
@@ -85,34 +74,48 @@ export function StepSlotPicker({
   const availableDates = React.useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const [y, m, d] = todayStr.split("-").map(Number);
-      const dateObj = new Date(y || new Date().getFullYear(), (m || 1) - 1, d || new Date().getDate());
-      dateObj.setDate(dateObj.getDate() + i);
-      const isoYear = dateObj.getFullYear();
-      const isoMonth = String(dateObj.getMonth() + 1).padStart(2, "0");
-      const isoDay = String(dateObj.getDate()).padStart(2, "0");
-      const isoDate = `${isoYear}-${isoMonth}-${isoDay}`;
+      const dateObj = new Date(y || new Date().getFullYear(), (m || 1) - 1, (d || 1) + i);
+      const iso = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}-${String(dateObj.getDate()).padStart(2, "0")}`;
       const dayName = i === 0 ? "Today" : i === 1 ? "Tomorrow" : dateObj.toLocaleDateString("en-US", { weekday: "short" });
       const monthDay = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const dayOfWeek = dateObj.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+      const isOperatingDay = operatingDays.includes(dayOfWeek);
+      const isHolidayClosed = closedDates.includes(iso);
       const isPastToday = i === 0 && nowHour >= (parseHour(slot2End) || 18);
-      return { isoDate, dayName, monthDay, isPastToday };
+      return { isoDate: iso, dayName, monthDay, isOperatingDay, isHolidayClosed, isPastToday, isDateDisabled: !isOperatingDay || isHolidayClosed || isPastToday };
     });
-  }, [todayStr, nowHour, slot2End]);
+  }, [todayStr, nowHour, slot2End, operatingDays, closedDates]);
 
+  const [selectedDayLower, selectedDayFull] = React.useMemo(() => {
+    if (!selectedDate) return ["", ""];
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const date = new Date(y, (m || 1) - 1, d || 1, 12);
+    return [date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase(), date.toLocaleDateString("en-US", { weekday: "long" })];
+  }, [selectedDate]);
+  const isHolidaySelected = Boolean(selectedDate && closedDates.includes(selectedDate));
+  const isSelectedDateClosed = Boolean(selectedDate && (!operatingDays.includes(selectedDayLower) || isHolidaySelected));
+
+  const hasAutoSelected = React.useRef(false);
   React.useEffect(() => {
+    const firstOpen = availableDates.find((d) => !d.isDateDisabled);
+    if (!hasAutoSelected.current && isSelectedDateClosed && firstOpen) {
+      hasAutoSelected.current = true;
+      onSelectDate(firstOpen.isoDate);
+      onSelectSlot("8am-12pm");
+      return;
+    }
     if (isToday) {
       const morningClosed = isSlotDisabled(slots[0]);
       const afternoonClosed = isSlotDisabled(slots[1]);
-      if (morningClosed && afternoonClosed) {
-        const tomorrow = availableDates[1]?.isoDate;
-        if (tomorrow && selectedDate === todayStr) {
-          onSelectDate(tomorrow);
-          onSelectSlot("8am-12pm");
-        }
+      if (morningClosed && afternoonClosed && firstOpen && selectedDate === todayStr && !hasAutoSelected.current) {
+        hasAutoSelected.current = true;
+        onSelectDate(firstOpen.isoDate);
+        onSelectSlot("8am-12pm");
       } else if (morningClosed && !afternoonClosed && selectedSlot === "8am-12pm") {
         onSelectSlot("1pm-6pm");
       }
     }
-  }, [selectedDate, isToday, nowHour, todayStr, selectedSlot]);
+  }, [selectedDate, isToday, nowHour, todayStr, selectedSlot, isSelectedDateClosed, availableDates]);
 
   return (
     <div className="space-y-6 p-5 sm:p-6 rounded-2xl bg-white border border-slate-200">
@@ -130,19 +133,30 @@ export function StepSlotPicker({
             className="w-full sm:w-auto text-xs px-3 py-1.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
+        {availableDates[0]?.isDateDisabled && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs font-semibold text-amber-800 flex items-center gap-2">
+            <Clock className="h-4 w-4 shrink-0 text-amber-600" />
+            <span>Notice: Pickup is unavailable today ({todayStr}). Earliest available date is {availableDates.find((d) => !d.isDateDisabled)?.dayName} ({availableDates.find((d) => !d.isDateDisabled)?.monthDay}).</span>
+          </div>
+        )}
+        {isSelectedDateClosed && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800 flex items-center gap-2">
+            <Clock className="h-4 w-4 shrink-0 text-rose-600" />
+            <span>{isHolidaySelected ? "Laundry Express is closed on this date for a scheduled closure. Orders cannot be scheduled." : `Pickup is closed on ${selectedDayFull}s. Orders cannot be placed on off days.`}</span>
+          </div>
+        )}
         <div className="grid grid-cols-2 min-[420px]:grid-cols-4 sm:grid-cols-7 gap-2">
           {availableDates.map((item) => {
             const isSelected = selectedDate === item.isoDate;
-            const isDateDisabled = item.isPastToday;
             return (
               <button
                 key={item.isoDate}
                 type="button"
-                disabled={isDateDisabled}
-                onClick={() => !isDateDisabled && onSelectDate(item.isoDate)}
+                disabled={item.isDateDisabled}
+                onClick={() => !item.isDateDisabled && onSelectDate(item.isoDate)}
                 className={cn(
                   "p-2 rounded-xl border text-center transition-all min-w-0",
-                  isDateDisabled
+                  item.isDateDisabled
                     ? "border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-60"
                     : isSelected
                     ? "border-primary bg-primary text-white shadow-xs font-bold cursor-pointer"
@@ -150,7 +164,7 @@ export function StepSlotPicker({
                 )}
               >
                 <span className="block text-xs truncate">
-                  {item.dayName} {isDateDisabled && "(Closed)"}
+                  {item.dayName} {item.isHolidayClosed ? "(Holiday)" : !item.isOperatingDay ? "(Off)" : item.isPastToday ? "(Closed)" : ""}
                 </span>
                 <span className={cn("block text-[11px] mt-0.5 truncate", isSelected ? "text-pink-100" : "text-slate-500")}>
                   {item.monthDay}

@@ -17,6 +17,8 @@ export interface TermItem {
 
 export interface BusinessSettings {
   operating_hours: string;
+  operating_days?: string[];
+  closed_dates?: string[];
   delivery_zones: string[];
   max_orders_per_slot?: number;
   slot1_start?: string;
@@ -34,6 +36,25 @@ export interface BusinessSettings {
 
 const isUuid = (val?: string): boolean =>
   Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
+
+export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
+  operating_hours: "",
+  operating_days: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+  closed_dates: [],
+  delivery_zones: [],
+  max_orders_per_slot: 10,
+  slot1_start: "08:00",
+  slot1_end: "12:00",
+  slot2_start: "13:00",
+  slot2_end: "18:00",
+  min_order_bag: 1,
+  max_order_bag: 50,
+  min_order_lbs: 10,
+  max_order_lbs: 100,
+  free_delivery_bags: 2,
+  free_delivery_lbs: 20,
+  standard_delivery_fee: 10,
+};
 
 export class ContentService {
   static async getFaqs(): Promise<FaqItem[]> {
@@ -127,7 +148,8 @@ export class ContentService {
     return { id: data.id, title: data.title, subtitle: data.subtitle || "", description: data.description };
   }
 
-  static async getSettings(): Promise<BusinessSettings | null> {
+
+  static async getSettings(): Promise<BusinessSettings> {
     try {
       const supabase = createAdminSupabaseClient();
       const { data, error } = await supabase
@@ -135,16 +157,24 @@ export class ContentService {
         .select("value")
         .eq("key", "business_operations")
         .maybeSingle();
-      if (error || !data) return null;
-      return (data?.value as BusinessSettings | undefined) ?? null;
+      if (error || !data?.value) return DEFAULT_BUSINESS_SETTINGS;
+      const v = data.value as Partial<BusinessSettings>;
+      return {
+        ...DEFAULT_BUSINESS_SETTINGS,
+        ...v,
+        operating_days: Array.isArray(v.operating_days) ? v.operating_days : DEFAULT_BUSINESS_SETTINGS.operating_days,
+        closed_dates: Array.isArray(v.closed_dates) ? v.closed_dates : [],
+        delivery_zones: Array.isArray(v.delivery_zones) ? v.delivery_zones : [],
+      };
     } catch {
-      return null;
+      return DEFAULT_BUSINESS_SETTINGS;
     }
   }
 
   static async updateSettings(updates: Partial<BusinessSettings>): Promise<BusinessSettings> {
     const allowedKeys = [
-      "operating_hours", "delivery_zones", "slot1_start", "slot1_end", "slot2_start", "slot2_end",
+      "operating_hours", "operating_days", "closed_dates", "delivery_zones",
+      "slot1_start", "slot1_end", "slot2_start", "slot2_end",
       "max_orders_per_slot",
       "min_order_bag", "max_order_bag", "min_order_lbs", "max_order_lbs",
       "free_delivery_bags", "free_delivery_lbs", "standard_delivery_fee",
@@ -153,10 +183,26 @@ export class ContentService {
       throw new Error("Unsupported business setting.");
     }
     const current = await this.getSettings();
-    const settings = { ...current, ...updates } as BusinessSettings;
+    const settings: BusinessSettings = {
+      ...current,
+      ...updates,
+      closed_dates: Array.isArray(updates.closed_dates)
+        ? Array.from(new Set(updates.closed_dates.filter(Boolean))).sort()
+        : (current.closed_dates ?? []),
+    };
     const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
     if (Object.prototype.hasOwnProperty.call(updates, "operating_hours") && !settings.operating_hours?.trim()) {
       throw new Error("Enter the business operating days or hours.");
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, "operating_days") &&
+      (!Array.isArray(settings.operating_days) || !settings.operating_days.length ||
+        settings.operating_days.some((d) => typeof d !== "string" || !d.trim()))) {
+      throw new Error("Select at least one operating day.");
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, "closed_dates") &&
+      (!Array.isArray(settings.closed_dates) ||
+        settings.closed_dates.some((d) => typeof d !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.trim())))) {
+      throw new Error("Closed dates must be valid calendar dates (YYYY-MM-DD).");
     }
     if (Object.prototype.hasOwnProperty.call(updates, "delivery_zones") &&
       (!Array.isArray(settings.delivery_zones) || !settings.delivery_zones.length ||
@@ -169,17 +215,11 @@ export class ContentService {
         throw new Error("Enter a valid time for each pickup window.");
       }
     }
-    for (const key of [
-      "min_order_bag", "max_order_bag", "min_order_lbs", "max_order_lbs",
-      "free_delivery_bags", "free_delivery_lbs", "standard_delivery_fee",
-    ] as const) {
+    for (const key of ["min_order_bag", "max_order_bag", "min_order_lbs", "max_order_lbs", "free_delivery_bags", "free_delivery_lbs", "standard_delivery_fee"] as const) {
       const value = updates[key];
-      if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
-        throw new Error("Enter valid, non-negative business thresholds.");
-      }
+      if (value !== undefined && (!Number.isFinite(value) || value < 0)) throw new Error("Enter valid, non-negative business thresholds.");
     }
-    if (updates.max_orders_per_slot !== undefined &&
-      (!Number.isInteger(updates.max_orders_per_slot) || updates.max_orders_per_slot < 1)) {
+    if (updates.max_orders_per_slot !== undefined && (!Number.isInteger(updates.max_orders_per_slot) || updates.max_orders_per_slot < 1)) {
       throw new Error("Pickup capacity must be a positive whole number.");
     }
     if ((settings.min_order_bag && settings.max_order_bag && settings.max_order_bag < settings.min_order_bag) ||
@@ -187,19 +227,11 @@ export class ContentService {
       throw new Error("Maximum order limits must be greater than or equal to minimum limits.");
     }
     const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase
-      .from("system_settings")
-      .upsert({
-        key: "business_operations",
-        value: settings,
-        description: "Operating hours, delivery zones, and thresholds",
-        updated_at: new Date().toISOString(),
-      })
-      .select("value")
-      .single();
-    if (error || !data) {
-      throw new Error(`Unable to save business settings: ${error?.message || "No settings returned."}`);
-    }
+    const { data, error } = await supabase.from("system_settings").upsert({
+      key: "business_operations", value: settings,
+      description: "Operating hours, delivery zones, and thresholds", updated_at: new Date().toISOString(),
+    }, { onConflict: "key" }).select("value").single();
+    if (error || !data) throw new Error(`Unable to save business settings: ${error?.message || "No settings returned."}`);
     return data.value as BusinessSettings;
   }
 }

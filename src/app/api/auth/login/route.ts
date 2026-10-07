@@ -12,8 +12,11 @@ import { consumeRateLimit } from "@/lib/security/rate-limit";
  */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { email, password } = body;
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid login payload is required." }, { status: 400 });
+    }
+    const { email, password } = body as Record<string, unknown>;
 
     if (!email || typeof email !== "string" || !password || typeof password !== "string") {
       return NextResponse.json(

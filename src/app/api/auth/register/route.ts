@@ -29,7 +29,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid registration payload is required." }, { status: 400 });
+    }
     const fullName = body.fullName || body.full_name || body.name;
     const { email, password, phone, verificationCode } = body;
 

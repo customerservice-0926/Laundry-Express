@@ -20,7 +20,10 @@ export async function POST(req: NextRequest) {
     if (!verified || verified.user.role !== "admin") {
       return NextResponse.json({ success: false, error: "Unauthorized. Admin role required." }, { status: 403 });
     }
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid plan payload is required." }, { status: 400 });
+    }
     const saved = await PricingPlanService.savePlan(body);
     return NextResponse.json({ success: true, plan: saved }, { status: 201 });
   } catch (error: unknown) {
@@ -39,7 +42,10 @@ export async function PATCH(req: NextRequest) {
     if (!verified || verified.user.role !== "admin") {
       return NextResponse.json({ success: false, error: "Unauthorized. Admin role required." }, { status: 403 });
     }
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid plan payload is required." }, { status: 400 });
+    }
     const updated = await PricingPlanService.updatePlan(body);
     return NextResponse.json({ success: true, plan: updated }, { status: 200 });
   } catch (error: unknown) {

@@ -46,9 +46,10 @@ function SuccessContent() {
       if (!response.ok || !data?.success || !data.order) throw new Error(data?.error || "Unable to retrieve order.");
       setOrder(data.order);
       const isOrderPaid = data.order.payment_status === "paid";
-      setPaid(isOrderPaid);
+      const isOrderAuthorized = data.order.payment_status === "authorized";
+      setPaid(isOrderPaid || isOrderAuthorized);
       setStatusError("");
-      if (isOrderPaid || data.order.payment_status === "failed") {
+      if (isOrderPaid || isOrderAuthorized || data.order.payment_status === "failed") {
         setIsStatusChecked(true);
         return true;
       }
@@ -120,7 +121,11 @@ function SuccessContent() {
       <div className="space-y-2">
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Order #{order.order_number || orderId} Placed!</h1>
         <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-          {paid ? "Payment confirmed. Your pickup is scheduled and our courier will arrive on time." : "Order recorded. Awaiting payment confirmation."}
+          {order.pricing_mode === "per_lb" && order.payment_status === "authorized"
+            ? "Card verified & saved! Your pickup is scheduled. We will measure your laundry on our scale upon arrival and charge the exact weight."
+            : paid
+            ? "Payment confirmed. Your pickup is scheduled and our courier will arrive on time."
+            : "Order recorded. Awaiting payment confirmation."}
         </p>
       </div>
 

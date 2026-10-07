@@ -53,6 +53,10 @@ export function mapOrderRecord(item: OrderRecord): Order {
     payment_status: String(item.payment_status || "pending"),
     invoice_email_sent_at: item.invoice_email_sent_at ? String(item.invoice_email_sent_at) : null,
     order_status: String(item.order_status || "pending") as OrderStatus,
+    stripe_customer_id: item.stripe_customer_id ? String(item.stripe_customer_id) : undefined,
+    stripe_payment_method_id: item.stripe_payment_method_id ? String(item.stripe_payment_method_id) : undefined,
+    card_brand: item.card_brand ? String(item.card_brand) : undefined,
+    card_last4: item.card_last4 ? String(item.card_last4) : undefined,
     stripe_payment_intent: item.stripe_payment_intent_id ? String(item.stripe_payment_intent_id) : undefined,
     proofs: proofs.map((proof) => {
       const record = proof as OrderRecord;

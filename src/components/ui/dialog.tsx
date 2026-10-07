@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ export interface DialogProps {
  *
  * Accessible modal dialog primitive enforcing:
  * - Complete background body & html scroll block while dialog is open
+ * - Portal to document.body preventing CSS transform / overflow containment issues
  * - Single unified scroll container (strictly prevents dual nested scrollbars)
  * - Backdrop click-to-close & escape key dismissal
  */
@@ -33,6 +35,12 @@ export function Dialog({
   children,
   className,
 }: DialogProps) {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Comprehensive body & HTML scroll lock
   React.useEffect(() => {
     if (!open) return;
@@ -63,7 +71,7 @@ export function Dialog({
     };
   }, [open, onOpenChange]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const sizeClasses: Record<DialogSize, string> = {
     sm: "max-w-sm",
@@ -72,7 +80,7 @@ export function Dialog({
     xl: "max-w-4xl",
   };
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -122,7 +130,8 @@ export function Dialog({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -1,19 +1,24 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { Star, ShieldCheck, Sparkles, CheckCircle2 } from "lucide-react";
 import { ReviewCard } from "./review-card";
+import { Dialog } from "@/components/ui/dialog";
 import type { OrderReview } from "@/types";
 
 export function ReviewsSection() {
   const [reviews, setReviews] = React.useState<OrderReview[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [selectedPhoto, setSelectedPhoto] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     fetch("/api/reviews?public=true")
       .then((res) => res.json())
       .then((data) => {
-        if (data.reviews && Array.isArray(data.reviews)) setReviews(data.reviews);
+        if (data.reviews && Array.isArray(data.reviews)) {
+          setReviews(data.reviews);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -114,7 +119,7 @@ export function ReviewsSection() {
             <div className="reviews-carousel flex gap-6 w-max px-4">
               {looped.map((rev, i) => (
                 <div key={`${rev.id}-${i}`} className="w-80 sm:w-96 shrink-0">
-                  <ReviewCard review={rev} />
+                  <ReviewCard review={rev} onPhotoClick={setSelectedPhoto} />
                 </div>
               ))}
             </div>
@@ -130,12 +135,34 @@ export function ReviewsSection() {
           >
             {reviews.map((rev) => (
               <div key={rev.id} className="h-full">
-                <ReviewCard review={rev} />
+                <ReviewCard review={rev} onPhotoClick={setSelectedPhoto} />
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Full-Screen Customer Laundry Photo Preview Modal */}
+      {selectedPhoto && (
+        <Dialog
+          open={!!selectedPhoto}
+          onOpenChange={() => setSelectedPhoto(null)}
+          title="Verified Customer Laundry Photo"
+          description="Customer photo proof uploaded upon doorstep delivery."
+          size="md"
+        >
+          <div className="relative h-80 sm:h-96 w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-900">
+            <Image
+              src={selectedPhoto}
+              alt="Verified customer laundry photo proof"
+              fill
+              sizes="(max-width: 768px) 100vw, 600px"
+              unoptimized
+              className="object-contain"
+            />
+          </div>
+        </Dialog>
+      )}
 
     </section>
   );

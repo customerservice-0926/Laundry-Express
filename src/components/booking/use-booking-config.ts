@@ -9,6 +9,8 @@ interface BookingSettings {
   slot2Start: string;
   slot2End: string;
   deliveryZones: { city: string; zip: string }[];
+  operatingDays: string[];
+  closedDates: string[];
 }
 
 interface BookingRates {
@@ -29,6 +31,8 @@ const EMPTY_SETTINGS: BookingSettings = {
   slot2Start: "",
   slot2End: "",
   deliveryZones: [],
+  operatingDays: [],
+  closedDates: [],
 };
 
 export interface ServerTime {
@@ -86,12 +90,16 @@ export function useBookingConfig(initialPricing?: Partial<PricingConfig>) {
         freeDeliveryBags: Number(p.free_delivery_threshold), freeDeliveryLbs: Number(p.free_delivery_lbs),
         minLbs: Number(p.min_lbs), maxLbs: Number(p.max_lbs),
       });
+      const operatingDays = Array.isArray(s.operating_days) ? s.operating_days : [];
+      const closedDates = Array.isArray(s.closed_dates) ? s.closed_dates : [];
       setSettings({
         slot1Start: s.slot1_start,
         slot1End: s.slot1_end,
         slot2Start: s.slot2_start,
         slot2End: s.slot2_end,
         deliveryZones,
+        operatingDays,
+        closedDates,
       });
     }).catch((cause: unknown) => {
       if (!cancelled) setError(cause instanceof Error ? cause.message : "Unable to load order settings.");

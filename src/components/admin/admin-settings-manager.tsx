@@ -40,6 +40,18 @@ export function AdminSettingsManager() {
     return () => { disposed = true; };
   }, []);
 
+  const refreshSettings = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/content?type=settings", { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setData((prev) => (prev ? { ...prev, settings: json.settings } : prev));
+      }
+    } catch {
+      // no-op
+    }
+  }, []);
+
   if (isLoading) return <p className="rounded-xl border bg-white p-6 text-sm text-slate-600">Loading saved settings...</p>;
   if (loadError || !data) {
     return <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
@@ -50,7 +62,7 @@ export function AdminSettingsManager() {
   return (
     <div className="space-y-6">
       <PricingSettingsForm initialPricing={data.pricing} />
-      <ScheduleSettingsForm initialSettings={data.settings} />
+      <ScheduleSettingsForm initialSettings={data.settings} onSaved={refreshSettings} />
       <CoverageSettingsForm initialSettings={data.settings} />
     </div>
   );

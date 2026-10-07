@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { OrderService } from "@/lib/services/order-service";
+import { OrderBillingService } from "@/lib/services/order-billing-service";
 import { PricingPlanService } from "@/lib/services/pricing-plan-service";
 import { CatalogService } from "@/lib/services/catalog-service";
 import { CouponService, type CouponItem } from "@/lib/services/coupon-service";
@@ -9,12 +10,7 @@ import { getVerifiedUser } from "@/lib/auth-request";
 import { validateCheckoutPayload } from "@/lib/checkout-validation";
 import { syncUserOrderContact } from "@/lib/services/checkout-sync-service";
 import { validateOrderAvailability } from "@/lib/services/booking-availability-service";
-
-const stripeKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeKey ? new Stripe(stripeKey, {
-  // @ts-expect-error -- Pin the API version used by this integration.
-  apiVersion: "2024-12-18.acacia",
-}) : null;
+import { stripe } from "@/lib/stripe/stripe-server";
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,15 +18,42 @@ export async function GET(req: NextRequest) {
     if (!verified?.user.id) return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
     const { user } = verified;
     const orderNumber = req.nextUrl.searchParams.get("order_id");
+    const sessionId = req.nextUrl.searchParams.get("session_id");
     if (!orderNumber) return NextResponse.json({ success: false, error: "Missing order identifier" }, { status: 400 });
 
-    const order = await OrderService.getOrderByNumber(orderNumber);
+    let order = await OrderService.getOrderByNumber(orderNumber);
     if (!order) return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     if (user.role !== "admin" && order.user_id !== user.id && order.customer_email?.toLowerCase() !== user.email.toLowerCase()) {
       return NextResponse.json({ success: false, error: "Forbidden." }, { status: 403 });
     }
 
-    return NextResponse.json({ success: true, paid: order.payment_status === "paid", order, customerName: order.customer_name, customerEmail: order.customer_email });
+    if (order.pricing_mode === "per_lb" && (!order.stripe_payment_method_id || order.payment_status === "pending") && sessionId && stripe) {
+      try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["setup_intent"] });
+        if (session && session.mode === "setup") {
+          const setupIntent = session.setup_intent as Stripe.SetupIntent | null;
+          const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || "";
+          const paymentMethodId = typeof setupIntent?.payment_method === "string" ? setupIntent.payment_method : setupIntent?.payment_method?.id || "";
+          if (customerId && paymentMethodId) {
+            const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+            const cardBrand = pm.card?.brand || "card";
+            const cardLast4 = pm.card?.last4 || "";
+            const updated = await OrderBillingService.recordCardAuthorized(order.id, {
+              stripeCustomerId: customerId,
+              stripePaymentMethodId: paymentMethodId,
+              cardBrand,
+              cardLast4,
+            });
+            if (updated) order = updated;
+          }
+        }
+      } catch (err) {
+        console.error("[api/checkout GET] sync setup session error:", err);
+      }
+    }
+
+    const isPaidOrAuthorized = order.payment_status === "paid" || order.payment_status === "authorized";
+    return NextResponse.json({ success: true, paid: isPaidOrAuthorized, order, customerName: order.customer_name, customerEmail: order.customer_email });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to retrieve order";
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
@@ -51,6 +74,7 @@ export async function POST(req: NextRequest) {
       pickup_slot: body.pickup_slot,
       city: body.city,
       zip_code: body.zip_code,
+      delivery_date: typeof body.delivery_date === "string" ? body.delivery_date : undefined,
     });
     if (availabilityError) return NextResponse.json({ success: false, error: availabilityError }, { status: 400 });
 
@@ -142,7 +166,7 @@ export async function POST(req: NextRequest) {
           product_data: {
             name: `Laundry Express — ${pkg ? pkg.name : createdOrder.pricing_mode === "per_bag" ? "By The Bag Wash & Fold" : "By The Pound (lb)"}`,
             description: `${createdOrder.pricing_mode === "per_lb" || pkg?.unit_type === "lb" ? `${createdOrder.estimated_weight_lbs} lbs` : `${createdOrder.bag_count} Bag(s)`} • Cold Water Gentle Care • 24hr Return`,
-            images: [`${origin}/brand/logo-badge.jpg`],
+            images: [`${origin}/brand/logo-badge.jpeg`],
           },
           unit_amount: netServiceAmountCents,
         },
@@ -159,13 +183,36 @@ export async function POST(req: NextRequest) {
 
     let session: Stripe.Checkout.Session;
     try {
-      session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"], line_items: lineItems, mode: "payment", customer_email: user.email,
-        success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}&order_id=${encodeURIComponent(createdOrder.order_number)}`,
-        cancel_url: `${origin}/order?canceled=true&order_id=${createdOrder.order_number}`,
-        metadata: { order_id: createdOrder.id, order_number: createdOrder.order_number, user_id: createdOrder.user_id || "", pickup_date: createdOrder.pickup_date || "", pickup_slot: createdOrder.pickup_slot || "" },
-        payment_intent_data: { metadata: { order_number: createdOrder.order_number, order_id: createdOrder.id } },
-      });
+      if (createdOrder.pricing_mode === "per_lb") {
+        const existingCustomers = await stripe.customers.list({ email: user.email, limit: 1 });
+        const stripeCustomer = existingCustomers.data[0] || await stripe.customers.create({
+          email: user.email, name: user.full_name || user.email, metadata: { user_id: user.id },
+        });
+
+        session = await stripe.checkout.sessions.create({
+          payment_method_types: ["card"],
+          mode: "setup",
+          customer: stripeCustomer.id,
+          success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}&order_id=${encodeURIComponent(createdOrder.order_number)}`,
+          cancel_url: `${origin}/order?canceled=true&order_id=${createdOrder.order_number}`,
+          metadata: {
+            order_id: createdOrder.id,
+            order_number: createdOrder.order_number,
+            user_id: createdOrder.user_id || "",
+            pickup_date: createdOrder.pickup_date || "",
+            pickup_slot: createdOrder.pickup_slot || "",
+            pricing_mode: "per_lb",
+          },
+        });
+      } else {
+        session = await stripe.checkout.sessions.create({
+          payment_method_types: ["card"], line_items: lineItems, mode: "payment", customer_email: user.email,
+          success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}&order_id=${encodeURIComponent(createdOrder.order_number)}`,
+          cancel_url: `${origin}/order?canceled=true&order_id=${createdOrder.order_number}`,
+          metadata: { order_id: createdOrder.id, order_number: createdOrder.order_number, user_id: createdOrder.user_id || "", pickup_date: createdOrder.pickup_date || "", pickup_slot: createdOrder.pickup_slot || "" },
+          payment_intent_data: { metadata: { order_number: createdOrder.order_number, order_id: createdOrder.id } },
+        });
+      }
     } catch (error) {
       await OrderService.markOrderPaymentFailed(createdOrder.order_number);
       throw error;

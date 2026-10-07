@@ -30,8 +30,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
-    const { email, otp, newPassword } = body;
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid reset payload is required." }, { status: 400 });
+    }
+    const { email, otp, newPassword } = body as Record<string, unknown>;
 
     if (!email || typeof email !== "string") {
       return NextResponse.json(

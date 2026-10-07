@@ -61,7 +61,7 @@ export function OrderInvoiceCard({ invoice, className = "" }: OrderInvoiceCardPr
         <div className="flex items-center gap-3.5">
           <div className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-2xl overflow-hidden shrink-0 border border-slate-200 bg-white p-1 shadow-xs flex items-center justify-center">
             <Image
-              src="/brand/logo-badge.jpg"
+              src="/brand/logo-badge.jpeg"
               alt="Laundry Express"
               width={64}
               height={64}

@@ -101,7 +101,7 @@ export function RegisterView() {
       <div className="flex items-center gap-4 border-b border-slate-100 pb-5">
         <div className="relative h-14 w-14 rounded-2xl overflow-hidden shadow-xs border border-slate-100 shrink-0">
           <Image
-            src="/brand/logo-badge.jpg"
+            src="/brand/logo-badge.jpeg"
             alt="Laundry Express Logo"
             fill
             sizes="56px"

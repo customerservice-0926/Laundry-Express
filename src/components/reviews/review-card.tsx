@@ -9,6 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 
 interface ReviewCardProps {
   review: OrderReview;
+  onPhotoClick?: (photoUrl: string) => void;
 }
 
 function getInitials(name?: string): string {
@@ -24,7 +25,7 @@ function getInitials(name?: string): string {
  * Displays verified customer rating, feedback text, customer name, review date,
  * and up to 3 real laundry photo proofs with clickable preview modal.
  */
-export function ReviewCard({ review }: ReviewCardProps) {
+export function ReviewCard({ review, onPhotoClick }: ReviewCardProps) {
   const [selectedPhoto, setSelectedPhoto] = React.useState<string | null>(null);
 
   const customerName = review.user?.full_name || review.customer_name || "Verified Customer";
@@ -33,6 +34,14 @@ export function ReviewCard({ review }: ReviewCardProps) {
   const photoUrls = (review.photos && review.photos.length > 0)
     ? review.photos.map((p) => p.photo_url)
     : (review.photo_urls || []);
+
+  const handlePhotoClick = (photoUrl: string) => {
+    if (onPhotoClick) {
+      onPhotoClick(photoUrl);
+    } else {
+      setSelectedPhoto(photoUrl);
+    }
+  };
 
   return (
     <>
@@ -97,7 +106,7 @@ export function ReviewCard({ review }: ReviewCardProps) {
                   <button
                     key={index}
                     type="button"
-                    onClick={() => setSelectedPhoto(photoUrl)}
+                    onClick={() => handlePhotoClick(photoUrl)}
                     className="relative h-16 w-16 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs cursor-pointer group/img shrink-0 hover:ring-2 hover:ring-primary transition-all"
                     title="Click to view full photo proof"
                   >
@@ -128,8 +137,8 @@ export function ReviewCard({ review }: ReviewCardProps) {
         </div>
       </div>
 
-      {/* High-Resolution Photo Preview Dialog */}
-      {selectedPhoto && (
+      {/* Fallback High-Resolution Photo Preview Dialog if no parent handler */}
+      {!onPhotoClick && selectedPhoto && (
         <Dialog
           open={!!selectedPhoto}
           onOpenChange={() => setSelectedPhoto(null)}

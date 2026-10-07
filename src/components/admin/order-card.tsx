@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Camera, AlertTriangle, Check, Send, ChevronRight } from "lucide-react";
+import { Clock, Camera, AlertTriangle, Check, Send, ChevronRight, Scale } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
 import { ORDER_STATUSES } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -11,6 +11,7 @@ interface OrderCardProps {
   onUpdateStatus: (orderId: string, newStatus: OrderStatus) => void;
   onOpenProofModal: (order: Order, type: "pickup" | "dropoff" | "damage") => void;
   onViewDetails?: (order: Order) => void;
+  onWeighOrder?: (order: Order) => void;
 }
 
 /**
@@ -24,6 +25,7 @@ export function OrderCard({
   onUpdateStatus,
   onOpenProofModal,
   onViewDetails,
+  onWeighOrder,
 }: OrderCardProps) {
   const statusMeta = ORDER_STATUSES[order.order_status] || ORDER_STATUSES.pending;
 
@@ -119,19 +121,44 @@ export function OrderCard({
         )}
 
         {order.order_status === "driver_assigned" && (
-          <Button
-            variant="primary"
-            size="sm"
-            className="h-8 px-3 text-xs"
-            onClick={() => onOpenProofModal(order, "pickup")}
-          >
-            <Camera className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Pickup Proof
-          </Button>
+          order.pricing_mode === "per_lb" && onWeighOrder ? (
+            <Button
+              variant="hero"
+              size="sm"
+              className="h-8 px-2.5 text-xs bg-amber-600 hover:bg-amber-700 font-bold"
+              onClick={() => onWeighOrder(order)}
+              title="Weigh clothes on scale and charge customer card upon pickup"
+            >
+              <Scale className="h-3.5 w-3.5 mr-1 shrink-0" />
+              Pickup &amp; Weigh
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              size="sm"
+              className="h-8 px-3 text-xs"
+              onClick={() => onOpenProofModal(order, "pickup")}
+            >
+              <Camera className="h-3.5 w-3.5 mr-1 shrink-0" />
+              Pickup Proof
+            </Button>
+          )
         )}
 
         {order.order_status === "in_wash" && (
           <>
+            {order.pricing_mode === "per_lb" && order.payment_status !== "paid" && onWeighOrder && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
+                onClick={() => onWeighOrder(order)}
+                title="Adjust scale weight or charge card"
+              >
+                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" />
+                Adjust Weight
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"

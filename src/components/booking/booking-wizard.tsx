@@ -96,7 +96,16 @@ export function BookingWizard({
   const isStep2Valid = Boolean(selectedDetergentId);
   const todayStr = serverTime?.todayStr || new Date().toISOString().split("T")[0];
   const nowHour = serverTime?.currentHour ?? new Date().getHours();
-  const isDateValid = Boolean(selectedDate && selectedDate >= todayStr);
+  const isOperatingDay = React.useMemo(() => {
+    if (!selectedDate) return false;
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const dayName = new Date(y, (m || 1) - 1, d || 1, 12).toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+    const days = Array.isArray(settings.operatingDays) ? settings.operatingDays : [];
+    return days.includes(dayName);
+  }, [selectedDate, settings.operatingDays]);
+
+  const isHolidayClosed = Boolean(selectedDate && settings.closedDates?.includes(selectedDate));
+  const isDateValid = Boolean(selectedDate && selectedDate >= todayStr && isOperatingDay && !isHolidayClosed);
   const isDropoffValid = !dropoffDate || dropoffDate >= selectedDate;
 
   const slot1EndHour = parseInt(settings.slot1End?.split(":")[0] || "12", 10);
@@ -165,17 +174,36 @@ export function BookingWizard({
                   slot1End={settings.slot1End}
                   slot2Start={settings.slot2Start}
                   slot2End={settings.slot2End}
+                  operatingDays={settings.operatingDays}
+                  closedDates={settings.closedDates}
                   serverTime={serverTime}
                 />
+                {!isOperatingDay && (
+                  <p className="text-xs text-rose-600 font-semibold px-1">
+                    Laundry pickup is closed on the selected day of the week. Please choose an active operating day.
+                  </p>
+                )}
+                {isHolidayClosed && (
+                  <p className="text-xs text-rose-600 font-semibold px-1">
+                    Laundry pickup is closed on this date for a scheduled closure. Please choose an open day.
+                  </p>
+                )}
                 {!isDropoffValid && <p className="text-xs text-rose-600 font-semibold px-1">Drop-off date cannot be before pickup date ({selectedDate}).</p>}
                 {isSelectedSlotClosed && (
                   <p className="text-xs text-rose-600 font-semibold px-1">
                     The {selectedSlot} pickup window for today is closed. Please select an available window or future date to proceed.
                   </p>
                 )}
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                   <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
-                  <Button variant="hero" size="lg" disabled={!isStep3Valid} onClick={() => isStep3Valid && setStep(4)}>Continue to Address <ArrowRight className="h-4 w-4 ml-2" /></Button>
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                    {!isStep3Valid && (
+                      <span className="text-xs text-rose-500 font-semibold">
+                        {!isDateValid ? "Choose an open pickup date" : isSelectedSlotClosed ? "Pickup slot closed for today" : "Selection required"}
+                      </span>
+                    )}
+                    <Button variant="hero" size="lg" disabled={!isStep3Valid} onClick={() => isStep3Valid && setStep(4)}>Continue to Address <ArrowRight className="h-4 w-4 ml-2" /></Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -192,7 +220,7 @@ export function BookingWizard({
               <StepReview pricingMode={pricingMode} bagCount={boundedBagCount} weightLbs={boundedWeightLbs} packageName={selectedPackage?.name} packageCapacity={selectedPackage?.capacity} packageUnit={selectedPackage?.unit_type} selectedDetergentId={selectedDetergentId} selectedDate={selectedDate} selectedSlot={selectedSlot} address={address} phone={phoneValue} isOutOfHome={isOutOfHome} slot1Start={settings.slot1Start} slot1End={settings.slot1End} slot2Start={settings.slot2Start} slot2End={settings.slot2End} onEditStep={setStep} onBack={() => setStep(4)} onContinue={() => setStep(6)} />
             )}
             {step === 6 && (
-              <StepPayment priceResult={priceResult} promoCode={promoCode} onPromoCodeChange={setPromoCode} onApplyPromo={handleApplyPromo} promoError={promoError} paymentMethod={paymentMethod} onSelectPaymentMethod={setPaymentMethod} isProcessing={isProcessing} onConfirm={handleConfirm} onBack={() => setStep(5)} />
+              <StepPayment pricingMode={pricingMode} priceResult={priceResult} promoCode={promoCode} onPromoCodeChange={setPromoCode} onApplyPromo={handleApplyPromo} promoError={promoError} paymentMethod={paymentMethod} onSelectPaymentMethod={setPaymentMethod} isProcessing={isProcessing} onConfirm={handleConfirm} onBack={() => setStep(5)} />
             )}
           </div>
           <div className="lg:col-span-1">

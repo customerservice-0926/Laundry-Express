@@ -5,6 +5,7 @@ import { MobileBottomNav } from "@/components/shared/mobile-bottom-nav";
 import { ContactView } from "@/components/contact/contact-view";
 import { APP_CONFIG } from "@/lib/constants";
 import { Phone } from "lucide-react";
+import { getBreadcrumbSchema, serializeJsonLd } from "@/lib/seo/jsonld-schemas";
 
 export const metadata: Metadata = {
   title: "Contact Us & Operations Hub — Lake in the Hills, IL, USA",
@@ -25,15 +26,30 @@ export const metadata: Metadata = {
     description: "Customer support, service coverage, and pickup scheduling in Lake in the Hills, IL, USA.",
     url: `${APP_CONFIG.url}/contact`,
     siteName: "Laundry Express",
-    images: [{ url: "/brand/logo-badge.jpg", width: 1200, height: 630, alt: "Laundry Express Contact" }],
+    images: [{ url: "/brand/logo-badge.jpeg", width: 1200, height: 630, alt: "Laundry Express Contact", type: "image/jpeg" }],
     locale: "en_US",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Contact Laundry Express — Lake in the Hills, IL, USA",
+    description: "Customer support, service coverage, and pickup scheduling in Lake in the Hills, IL, USA.",
+    images: ["/brand/logo-badge.jpeg"],
   },
 };
 
 export default function ContactPage() {
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Contact", path: "/contact" },
+  ]);
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50/60 overflow-x-clip pt-12 sm:pt-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
+      />
       {/* Sticky Global Navigation Navbar */}
       <Navbar />
 

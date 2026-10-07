@@ -17,8 +17,11 @@ export async function POST(req: NextRequest) {
     }
     const { user } = verified;
 
-    const body = await req.json();
-    const { fullName, phone, address, userId } = body;
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "A valid JSON payload is required." }, { status: 400 });
+    }
+    const { fullName, phone, address, userId } = body as Record<string, unknown>;
     const targetUserId = (userId as string) || user.id;
 
     // Prevent IDOR: customers can only edit their own profile

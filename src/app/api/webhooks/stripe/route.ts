@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import Stripe from "stripe";
+import type Stripe from "stripe";
+import { stripe } from "@/lib/stripe/stripe-server";
 import { OrderService } from "@/lib/services/order-service";
+import { OrderBillingService } from "@/lib/services/order-billing-service";
 import { ContentService } from "@/lib/services/content-service";
 import { sendInvoiceEmail, type InvoiceEmailPayload } from "@/lib/services/email-service";
 import { orderToUnifiedInvoice } from "@/lib/invoice/invoice-utils";
@@ -9,8 +11,8 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 export async function POST(req: NextRequest) {
   const stripeSecret = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!stripeSecret || !webhookSecret) {
-    console.error("[stripe-webhook] Stripe secrets are not configured.");
+  if (!stripeSecret || !webhookSecret || !stripe) {
+    console.error("[stripe-webhook] Stripe is not configured.");
     return NextResponse.json({ error: "Payment webhook is not configured." }, { status: 503 });
   }
   const sig = req.headers.get("stripe-signature");
@@ -18,65 +20,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 });
   }
 
-  const stripe = new Stripe(stripeSecret, {
-    // @ts-expect-error -- Pin the API version used by this integration.
-    apiVersion: "2024-12-18.acacia",
-  });
-
   let event: Stripe.Event;
   try {
     const rawBody = await req.arrayBuffer();
     event = stripe.webhooks.constructEvent(Buffer.from(rawBody), sig, webhookSecret);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Webhook signature verification failed";
-    console.error("[stripe-webhook] signature error:", msg);
+    console.error("[stripe-webhook] signature failed:", msg);
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  try {
-    const supabase = createAdminSupabaseClient();
-    const { data: claimed, error: claimError } = await supabase.rpc("claim_stripe_webhook_event", {
-        event_id_input: event.id,
-        event_type_input: event.type,
-      });
-    if (claimError) throw new Error(`Unable to claim Stripe event: ${claimError.message}`);
-    if (!claimed) return NextResponse.json({ received: true, idempotent: true });
+  const supabase = createAdminSupabaseClient();
+  const { error: claimError } = await supabase.from("stripe_webhook_events").insert({ event_id: event.id });
+  if (claimError) {
+    if (claimError.code === "23505") {
+      return NextResponse.json({ received: true, deduplicated: true });
+    }
+    return NextResponse.json({ error: "Could not claim webhook event" }, { status: 500 });
+  }
 
+  try {
     switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutCompleted(session);
+      case "checkout.session.completed":
+        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         break;
-      }
-      case "payment_intent.payment_failed": {
-        const pi = event.data.object as Stripe.PaymentIntent;
-        console.warn("[stripe-webhook] payment failed for intent:", pi.id, pi.last_payment_error?.message);
-        break;
-      }
       case "checkout.session.expired": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        console.info("[stripe-webhook] checkout session expired:", session.id);
-        const orderNumber = session.metadata?.order_number;
-        if (orderNumber) await OrderService.markOrderPaymentFailed(orderNumber);
+        const expired = event.data.object as Stripe.Checkout.Session;
+        const identifier = expired.metadata?.order_number || expired.metadata?.order_id;
+        if (identifier) await OrderService.markOrderPaymentFailed(identifier);
         break;
       }
       default:
         break;
     }
-
-    const { data, error } = await supabase.from("stripe_webhook_events")
-      .update({ status: "completed", updated_at: new Date().toISOString() })
-      .eq("event_id", event.id).select("event_id").maybeSingle();
-    if (error || !data) throw new Error(`Unable to complete Stripe event: ${error?.message || "Event claim missing."}`);
-  } catch (handlerErr: unknown) {
-    const msg = handlerErr instanceof Error ? handlerErr.message : "Webhook handler error";
-    console.error("[stripe-webhook] processing error:", msg);
+  } catch (processingError: unknown) {
+    const msg = processingError instanceof Error ? processingError.message : "Processing failed";
+    console.error(`[stripe-webhook] failed to process ${event.type}:`, msg);
     try {
-      const supabase = createAdminSupabaseClient();
-      const { error } = await supabase.from("stripe_webhook_events")
-        .update({ status: "failed", updated_at: new Date().toISOString() })
-        .eq("event_id", event.id);
-      if (error) console.error("[stripe-webhook] could not release failed event:", error.message);
+      await supabase.from("stripe_webhook_events").delete().eq("event_id", event.id);
     } catch (releaseError) {
       console.error("[stripe-webhook] could not release failed event:", releaseError);
     }
@@ -87,18 +68,49 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  if (session.payment_status !== "paid") return;
-
   const { order_id, order_number } = session.metadata || {};
   const identifier = order_number || order_id;
   if (!identifier) {
     throw new Error("checkout.session.completed is missing order metadata.");
   }
 
-  const order = await OrderService.getOrderByNumber(identifier);
-  if (!order) {
-    throw new Error(`Paid order ${identifier} was not found.`);
+  // Handle Per-Pound Setup Mode (Card Authorized on File)
+  if (session.mode === "setup") {
+    const order = await OrderService.getOrderByNumber(identifier);
+    if (!order) throw new Error(`Order ${identifier} not found for setup session.`);
+
+    const setupIntentId = typeof session.setup_intent === "string" ? session.setup_intent : session.setup_intent?.id;
+    const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || "";
+    let paymentMethodId = "";
+    let cardBrand = "card";
+    let cardLast4 = "";
+
+    if (setupIntentId && stripe) {
+      const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+      paymentMethodId = typeof setupIntent.payment_method === "string" ? setupIntent.payment_method : setupIntent.payment_method?.id || "";
+      if (paymentMethodId) {
+        const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+        cardBrand = pm.card?.brand || "card";
+        cardLast4 = pm.card?.last4 || "";
+      }
+    }
+
+    await OrderBillingService.recordCardAuthorized(order.id, {
+      stripeCustomerId: customerId,
+      stripePaymentMethodId: paymentMethodId,
+      cardBrand,
+      cardLast4,
+    });
+    console.info(`[stripe-webhook] Card verified & saved for per-pound order ${order.order_number}`);
+    return;
   }
+
+  // Handle Standard Immediate Payment (Bags / Packages)
+  if (session.payment_status !== "paid") return;
+
+  const order = await OrderService.getOrderByNumber(identifier);
+  if (!order) throw new Error(`Paid order ${identifier} was not found.`);
+
   const expectedAmount = Math.round(Number(order.total_amount) * 100);
   if (session.currency !== "usd" || session.amount_total !== expectedAmount) {
     throw new Error(`Stripe payment amount does not match order ${identifier}.`);
@@ -132,7 +144,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     if (error) throw new Error(`Unable to record coupon use: ${error.message}`);
   }
 
-  // 2. Generate and dispatch official invoice email to customer and admin
+  // Generate and dispatch official invoice email to customer and admin
   try {
     const settings = await ContentService.getSettings();
     const invoicePayload = orderToUnifiedInvoice(finalOrder, {

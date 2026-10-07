@@ -78,7 +78,7 @@ export function generateInvoiceHtml(inv: UnifiedInvoiceInput): string {
   const siteUrl = (!rawSiteUrl || rawSiteUrl.includes("localhost") || rawSiteUrl.includes("127.0.0.1"))
     ? "https://www.laundryexpressservices.com"
     : rawSiteUrl;
-  const logoUrl = typeof window !== "undefined" ? "/brand/logo-badge.jpg" : `${siteUrl.replace(/\/$/, "")}/brand/logo-badge.jpg`;
+  const logoUrl = typeof window !== "undefined" ? "/brand/logo-badge.jpeg" : `${siteUrl.replace(/\/$/, "")}/brand/logo-badge.jpeg`;
 
   return `<!DOCTYPE html>
 <html lang="en">

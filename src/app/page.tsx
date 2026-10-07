@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     description: "Professional doorstep laundry pickup, wash, fold, and delivery. View available service plans.",
     url: APP_CONFIG.url,
     siteName: "Laundry Express",
-    images: [{ url: "/brand/logo-badge.jpg", width: 1200, height: 630, alt: "Laundry Express Logo" }],
+    images: [{ url: "/brand/logo-badge.jpeg", width: 1200, height: 630, type: "image/jpeg", alt: "Laundry Express Logo" }],
     locale: "en_US",
     type: "website",
   },
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Laundry Express — Pick Up • Wash • Fold • Deliver",
     description: "Laundry pickup and delivery with clear service plans and convenient booking.",
-    images: ["/brand/logo-badge.jpg"],
+    images: ["/brand/logo-badge.jpeg"],
   },
 };
 
