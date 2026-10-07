@@ -31,12 +31,28 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createAdminSupabaseClient();
-  const { error: claimError } = await supabase.from("stripe_webhook_events").insert({ event_id: event.id });
-  if (claimError) {
-    if (claimError.code === "23505") {
-      return NextResponse.json({ received: true, deduplicated: true });
+  let isDeduplicated = false;
+  try {
+    const { error: claimError } = await supabase.from("stripe_webhook_events").insert({
+      event_id: event.id,
+      event_type: event.type,
+      status: "processing",
+      lease_expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    });
+
+    if (claimError) {
+      if (claimError.code === "23505") {
+        isDeduplicated = true;
+      } else {
+        console.warn("[stripe-webhook] Claim table notification:", claimError.message);
+      }
     }
-    return NextResponse.json({ error: "Could not claim webhook event" }, { status: 500 });
+  } catch (claimEx) {
+    console.warn("[stripe-webhook] Event claim fallback:", claimEx);
+  }
+
+  if (isDeduplicated) {
+    return NextResponse.json({ received: true, deduplicated: true });
   }
 
   try {
@@ -53,6 +69,10 @@ export async function POST(req: NextRequest) {
       default:
         break;
     }
+
+    try {
+      await supabase.from("stripe_webhook_events").update({ status: "completed" }).eq("event_id", event.id);
+    } catch {}
   } catch (processingError: unknown) {
     const msg = processingError instanceof Error ? processingError.message : "Processing failed";
     console.error(`[stripe-webhook] failed to process ${event.type}:`, msg);
