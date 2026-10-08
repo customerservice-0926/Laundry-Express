@@ -2,9 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import {
-  User, Phone, Mail, MapPin, Sparkles, CreditCard, Camera, AlertTriangle, CheckCircle2, Calendar, Scale,
-} from "lucide-react";
+import { User, Phone, Mail, MapPin, Sparkles, CreditCard, Camera, AlertTriangle, CheckCircle2, Calendar, Scale } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
 import { ORDER_STATUSES } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -23,13 +21,7 @@ interface OrderDetailModalProps {
 }
 
 export function OrderDetailModal({
-  order,
-  isOpen,
-  onClose,
-  onUpdateStatus,
-  onOpenProofModal,
-  onWeighOrder,
-  allOrders = [],
+  order, isOpen, onClose, onUpdateStatus, onOpenProofModal, onWeighOrder, allOrders = [],
 }: OrderDetailModalProps) {
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
   const [statusError, setStatusError] = React.useState("");
@@ -37,6 +29,10 @@ export function OrderDetailModal({
 
   const statusMeta = ORDER_STATUSES[order.order_status] || ORDER_STATUSES.pending;
   const detergentName = order.detergent_name || order.detergent_id;
+  const canWeighAndCharge = Boolean(
+    order.pricing_mode === "per_lb" && order.payment_method === "card" && order.payment_status !== "paid" &&
+    (order.stripe_payment_method_id || order.card_last4) && !order.stripe_payment_intent?.startsWith("PHONE-")
+  );
   const userPastOrders = allOrders.filter((o) => (order.customer_email && o.customer_email === order.customer_email) || (order.user_id && o.user_id === order.user_id));
   const prevOrdersCount = userPastOrders.filter((o) => o.id !== order.id).length;
   const lifetimeSpent = userPastOrders.reduce((sum, o) => sum + o.total_amount, 0) || order.total_amount;
@@ -222,7 +218,7 @@ export function OrderDetailModal({
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
           <Button variant="outline" size="sm" onClick={onClose}>Close Inspection</Button>
           <div className="flex items-center gap-2">
-            {order.pricing_mode === "per_lb" && order.payment_status !== "paid" && order.order_status !== "completed" && order.order_status !== "cancelled" && onWeighOrder && (
+            {canWeighAndCharge && order.order_status !== "completed" && order.order_status !== "cancelled" && onWeighOrder && (
               <Button variant="hero" size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => { onClose(); onWeighOrder(order); }}>
                 <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Weigh &amp; Charge
               </Button>

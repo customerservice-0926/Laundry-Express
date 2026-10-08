@@ -138,7 +138,7 @@ export function AdminAnalytics({ orders }: AdminAnalyticsProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/70 space-y-1">
           <div className="flex items-center justify-between text-emerald-800">
             <span className="text-[11px] font-black uppercase tracking-wider">Completed Revenue</span>

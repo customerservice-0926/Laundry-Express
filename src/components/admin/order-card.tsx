@@ -28,6 +28,13 @@ export function OrderCard({
   onWeighOrder,
 }: OrderCardProps) {
   const statusMeta = ORDER_STATUSES[order.order_status] || ORDER_STATUSES.pending;
+  const canWeighAndCharge = Boolean(
+    order.pricing_mode === "per_lb" &&
+    order.payment_method === "card" &&
+    order.payment_status !== "paid" &&
+    (order.stripe_payment_method_id || order.card_last4) &&
+    !order.stripe_payment_intent?.startsWith("PHONE-")
+  );
 
   return (
     <div
@@ -121,7 +128,7 @@ export function OrderCard({
         )}
 
         {order.order_status === "driver_assigned" && (
-          order.pricing_mode === "per_lb" && onWeighOrder ? (
+          canWeighAndCharge && onWeighOrder ? (
             <Button
               variant="hero"
               size="sm"
@@ -147,7 +154,7 @@ export function OrderCard({
 
         {order.order_status === "in_wash" && (
           <>
-            {order.pricing_mode === "per_lb" && order.payment_status !== "paid" && onWeighOrder && (
+            {canWeighAndCharge && onWeighOrder && (
               <Button
                 variant="outline"
                 size="sm"

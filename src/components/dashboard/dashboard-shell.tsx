@@ -50,7 +50,7 @@ export function DashboardShell({
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   return (
-    <div className="min-h-screen lg:h-screen flex flex-col lg:flex-row bg-slate-50/60 w-full overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen flex flex-col lg:flex-row bg-slate-50/60 w-full min-w-0">
       {/* Unified Role-Aware Sidebar */}
       <DashboardSidebar
         role={role}
@@ -80,7 +80,7 @@ export function DashboardShell({
         />
 
         {/* Dynamic Nested Content */}
-        <div className="p-3 sm:p-5 lg:p-8 max-w-7xl w-full mx-auto space-y-6 min-w-0 max-w-full overflow-x-hidden">
+        <div className="p-3 sm:p-5 lg:p-6 xl:p-8 max-w-7xl w-full mx-auto space-y-6 min-w-0">
           {children}
         </div>
       </main>
