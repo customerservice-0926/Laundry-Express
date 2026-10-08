@@ -90,26 +90,28 @@ export function PlanComparison({ initialRates }: PlanComparisonProps) {
       </div>
 
       <div className="hidden md:block bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
-        <table className="w-full text-left border-collapse text-xs table-fixed">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
-              <th scope="col" className="py-4 px-6 font-bold">Feature</th>
-              {columns.map((c) => (
-                <th key={c.key} scope="col" className={`py-4 px-6 font-bold ${c.color}`}>{c.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {rows.map((row) => (
-              <tr key={row.feature} className="hover:bg-slate-50/50 transition-colors">
-                <th scope="row" className="py-4 px-6 font-bold text-slate-900">{row.feature}</th>
+        <div className="overflow-x-auto w-full">
+          <table className="w-full min-w-[640px] text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
+                <th scope="col" className="py-4 px-6 font-bold whitespace-nowrap">Feature</th>
                 {columns.map((c) => (
-                  <td key={c.key} className="py-4 px-6 text-slate-700 font-medium break-words">{row[c.key]}</td>
+                  <th key={c.key} scope="col" className={`py-4 px-6 font-bold whitespace-nowrap ${c.color}`}>{c.label}</th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((row) => (
+                <tr key={row.feature} className="hover:bg-slate-50/50 transition-colors">
+                  <th scope="row" className="py-4 px-6 font-bold text-slate-900 whitespace-nowrap">{row.feature}</th>
+                  {columns.map((c) => (
+                    <td key={c.key} className="py-4 px-6 text-slate-700 font-medium break-words">{row[c.key]}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="md:hidden space-y-4">

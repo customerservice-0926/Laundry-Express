@@ -22,6 +22,13 @@ export function OrderTableRow({
   onWeighOrder,
 }: OrderTableRowProps) {
   const statusMeta = ORDER_STATUSES[order.order_status] || ORDER_STATUSES.pending;
+  const canWeighAndCharge = Boolean(
+    order.pricing_mode === "per_lb" &&
+    order.payment_method === "card" &&
+    order.payment_status !== "paid" &&
+    (order.stripe_payment_method_id || order.card_last4) &&
+    !order.stripe_payment_intent?.startsWith("PHONE-")
+  );
 
   return (
     <tr
@@ -29,9 +36,9 @@ export function OrderTableRow({
       className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
       title="Click row to inspect complete order details"
     >
-      <td className="p-3.5">
+      <td className="p-3 lg:p-3.5 whitespace-nowrap">
         <div className="text-left font-extrabold text-slate-900 group-hover:text-primary transition-colors flex flex-col">
-          <span className="underline underline-offset-2 decoration-slate-300 group-hover:decoration-primary">
+          <span className="underline underline-offset-2 decoration-slate-300 group-hover:decoration-primary font-mono text-xs block max-w-[150px] truncate" title={order.order_number}>
             {order.order_number}
           </span>
           <span className="text-[10px] text-slate-400 font-mono mt-0.5 font-normal">
@@ -40,24 +47,24 @@ export function OrderTableRow({
         </div>
       </td>
 
-      <td className="p-3.5">
-        <span className="font-semibold text-slate-800 block">
+      <td className="p-3 lg:p-3.5 min-w-[180px] max-w-[260px]">
+        <span className="font-semibold text-slate-800 block truncate">
           {order.customer_name || order.user?.full_name || "Customer"}
         </span>
-        <span className="text-[11px] text-slate-500 block max-w-xs truncate" title={[order.street_address, order.apt_unit ? `Apt ${order.apt_unit}` : "", order.city, order.state, order.zip_code].filter(Boolean).join(", ") || order.pickup_address || "Doorstep Address"}>
+        <span className="text-[11px] text-slate-500 block max-w-[240px] truncate" title={[order.street_address, order.apt_unit ? `Apt ${order.apt_unit}` : "", order.city, order.state, order.zip_code].filter(Boolean).join(", ") || order.pickup_address || "Doorstep Address"}>
           {[order.street_address, order.apt_unit ? `Apt ${order.apt_unit}` : "", order.city, order.state, order.zip_code].filter(Boolean).join(", ") || order.pickup_address || "Doorstep Address"}
         </span>
 
         {/* Status Callout Badges */}
         <div className="flex flex-wrap items-center gap-1.5 mt-1">
           {order.is_out_of_home && (
-            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 whitespace-nowrap">
               Away • Bag Outside Door
             </span>
           )}
 
           {order.has_preexisting_damage && (
-            <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1">
+            <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1 whitespace-nowrap">
               <AlertTriangle className="h-3 w-3 shrink-0 text-rose-600" />
               Damage Logged • Customer Notified
             </span>
@@ -65,7 +72,7 @@ export function OrderTableRow({
         </div>
       </td>
 
-      <td className="p-3.5">
+      <td className="p-3 lg:p-3.5 whitespace-nowrap">
         <span className="font-bold text-sky-800 uppercase text-[10px] block">
           {order.pricing_mode === "per_bag"
             ? "By Bag"
@@ -82,7 +89,7 @@ export function OrderTableRow({
         </span>
       </td>
 
-      <td className="p-3.5">
+      <td className="p-3 lg:p-3.5 whitespace-nowrap">
         <span className="font-medium text-slate-900 block">{order.pickup_date}</span>
         <span className="text-slate-500 text-[11px] flex items-center gap-1">
           <Clock className="h-3 w-3 text-sky-600 shrink-0" />
@@ -90,11 +97,11 @@ export function OrderTableRow({
         </span>
       </td>
 
-      <td className="p-3.5 font-bold text-slate-900">
+      <td className="p-3 lg:p-3.5 font-bold text-slate-900 whitespace-nowrap">
         {formatCurrency(order.total_amount)}
       </td>
 
-      <td className="p-3.5">
+      <td className="p-3 lg:p-3.5 whitespace-nowrap">
         <span
           className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusMeta.color}`}
         >
@@ -102,7 +109,7 @@ export function OrderTableRow({
         </span>
       </td>
 
-      <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
+      <td className="p-3 lg:p-3.5 text-right space-x-1.5 whitespace-nowrap min-w-[170px]">
         {/* Step-by-Step Progressive Action Buttons */}
         {order.order_status === "confirmed" && (
           <Button
@@ -121,7 +128,7 @@ export function OrderTableRow({
         )}
 
         {order.order_status === "driver_assigned" && (
-          order.pricing_mode === "per_lb" && onWeighOrder ? (
+          canWeighAndCharge && onWeighOrder ? (
             <Button
               variant="hero"
               size="sm"
@@ -154,7 +161,7 @@ export function OrderTableRow({
 
         {order.order_status === "in_wash" && (
           <div className="inline-flex items-center gap-1.5">
-            {order.pricing_mode === "per_lb" && order.payment_status !== "paid" && onWeighOrder && (
+            {canWeighAndCharge && onWeighOrder && (
               <Button
                 variant="outline"
                 size="sm"

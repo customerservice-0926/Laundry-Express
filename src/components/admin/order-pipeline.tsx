@@ -171,32 +171,34 @@ export function OrderPipeline({
       </div>
 
       {/* Desktop Orders Table */}
-      <div className="hidden lg:block rounded-3xl border border-slate-200/80 bg-white overflow-hidden shadow-xs">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-            <tr>
-              <th className="p-3.5">Order</th>
-              <th className="p-3.5">Customer &amp; Notes</th>
-              <th className="p-3.5">Mode &amp; Volume</th>
-              <th className="p-3.5">Scheduled Slot</th>
-              <th className="p-3.5">Total</th>
-              <th className="p-3.5">Status</th>
-              <th className="p-3.5 text-right">Progressive Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 text-slate-700">
-            {filteredOrders.map((ord) => (
-              <OrderTableRow
-                key={ord.id}
-                order={ord}
-                onUpdateStatus={handleStatusChangeWithNotification}
-                onOpenProofModal={handleOpenProofModal}
-                onViewDetails={(o) => setDetailOrderId(o.id)}
-                onWeighOrder={(o) => setWeighOrder(o)}
-              />
-            ))}
-          </tbody>
-        </table>
+      <div className="hidden lg:block rounded-3xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full min-w-[960px] text-left text-xs">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+              <tr>
+                <th className="p-3 lg:p-3.5 whitespace-nowrap">Order</th>
+                <th className="p-3 lg:p-3.5 min-w-[180px]">Customer &amp; Notes</th>
+                <th className="p-3 lg:p-3.5 whitespace-nowrap">Mode &amp; Volume</th>
+                <th className="p-3 lg:p-3.5 whitespace-nowrap">Scheduled Slot</th>
+                <th className="p-3 lg:p-3.5 whitespace-nowrap">Total</th>
+                <th className="p-3 lg:p-3.5 whitespace-nowrap">Status</th>
+                <th className="p-3 lg:p-3.5 text-right whitespace-nowrap min-w-[170px]">Progressive Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {filteredOrders.map((ord) => (
+                <OrderTableRow
+                  key={ord.id}
+                  order={ord}
+                  onUpdateStatus={handleStatusChangeWithNotification}
+                  onOpenProofModal={handleOpenProofModal}
+                  onViewDetails={(o) => setDetailOrderId(o.id)}
+                  onWeighOrder={(o) => setWeighOrder(o)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Mobile Card View */}

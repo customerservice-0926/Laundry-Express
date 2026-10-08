@@ -159,52 +159,54 @@ export function TransactionsManager({ orders }: TransactionsManagerProps) {
 
       {/* Desktop Table */}
       <div className="hidden lg:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <table className="w-full text-left border-collapse text-sm">
-          <thead>
-            <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-              <th className="py-3.5 px-4">Date &amp; Time</th>
-              <th className="py-3.5 px-4">Customer</th>
-              <th className="py-3.5 px-4">Order #</th>
-              <th className="py-3.5 px-4">Method</th>
-              <th className="py-3.5 px-4">Amount</th>
-              <th className="py-3.5 px-4">Status</th>
-              <th className="py-3.5 px-4 text-right">Stripe Intent</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredTransactions.map((txn) => (
-              <tr key={txn.id} className="hover:bg-pink-50/30 transition-colors">
-                <td className="py-3.5 px-4 text-xs text-slate-600">
-                  {new Date(txn.date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                </td>
-                <td className="py-3.5 px-4">
-                  <p className="font-bold text-slate-900">{txn.customer_name}</p>
-                  <p className="text-xs text-slate-500">{txn.customer_email}</p>
-                </td>
-                <td className="py-3.5 px-4">
-                  <span className="font-mono text-xs font-bold text-slate-900">
-                    {txn.order_number}
-                  </span>
-                </td>
-                <td className="py-3.5 px-4 text-xs font-semibold text-slate-700">
-                  <span className="flex items-center gap-1.5">
-                    <CreditCard className="h-3.5 w-3.5 text-slate-400" />
-                    {txn.method} (•••• {txn.card_last4})
-                  </span>
-                </td>
-                <td className="py-3.5 px-4 font-black text-slate-900">{formatCurrency(txn.amount)}</td>
-                <td className="py-3.5 px-4">
-                  <Badge variant={txn.status === "succeeded" ? "success" : txn.status === "pending" ? "warning" : "danger"}>
-                    {txn.status}
-                  </Badge>
-                </td>
-                <td className="py-3.5 px-4 text-right">
-                  <span className="font-mono text-[11px] text-slate-500 bg-slate-100 px-2 py-1 rounded-md">{txn.stripe_payment_intent.slice(0, 14)}...</span>
-                </td>
+        <div className="overflow-x-auto w-full">
+          <table className="w-full min-w-[880px] text-left border-collapse text-sm">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <th className="py-3.5 px-4 whitespace-nowrap">Date &amp; Time</th>
+                <th className="py-3.5 px-4 min-w-[170px]">Customer</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Order #</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Method</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Amount</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Stripe Intent</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredTransactions.map((txn) => (
+                <tr key={txn.id} className="hover:bg-pink-50/30 transition-colors">
+                  <td className="py-3.5 px-4 text-xs text-slate-600 whitespace-nowrap">
+                    {new Date(txn.date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                  <td className="py-3.5 px-4 min-w-[170px]">
+                    <p className="font-bold text-slate-900">{txn.customer_name}</p>
+                    <p className="text-xs text-slate-500">{txn.customer_email}</p>
+                  </td>
+                  <td className="py-3.5 px-4 whitespace-nowrap">
+                    <span className="font-mono text-xs font-bold text-slate-900">
+                      {txn.order_number}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                    <span className="flex items-center gap-1.5">
+                      <CreditCard className="h-3.5 w-3.5 text-slate-400" />
+                      {txn.method} (•••• {txn.card_last4})
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 font-black text-slate-900 whitespace-nowrap">{formatCurrency(txn.amount)}</td>
+                  <td className="py-3.5 px-4 whitespace-nowrap">
+                    <Badge variant={txn.status === "succeeded" ? "success" : txn.status === "pending" ? "warning" : "danger"}>
+                      {txn.status}
+                    </Badge>
+                  </td>
+                  <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                    <span className="font-mono text-[11px] text-slate-500 bg-slate-100 px-2 py-1 rounded-md">{txn.stripe_payment_intent.slice(0, 14)}...</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Mobile/Tablet Card View */}

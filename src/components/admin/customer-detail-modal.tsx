@@ -115,25 +115,25 @@ export function CustomerDetailModal({
               <p className="text-slate-400 py-4 text-center italic">No orders logged yet.</p>
             ) : (
               <>
-                <div className="hidden sm:block rounded-xl border border-slate-200 overflow-hidden">
-                  <table className="w-full text-left text-xs">
+                <div className="hidden sm:block rounded-xl border border-slate-200 overflow-x-auto w-full">
+                  <table className="w-full min-w-[500px] text-left text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
                       <tr>
-                        <th className="p-2.5">Order</th>
-                        <th className="p-2.5">Date</th>
-                        <th className="p-2.5">Mode</th>
-                        <th className="p-2.5">Total</th>
-                        <th className="p-2.5">Status</th>
+                        <th className="p-2.5 whitespace-nowrap">Order</th>
+                        <th className="p-2.5 whitespace-nowrap">Date</th>
+                        <th className="p-2.5 whitespace-nowrap">Mode</th>
+                        <th className="p-2.5 whitespace-nowrap">Total</th>
+                        <th className="p-2.5 whitespace-nowrap">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {customer.orders.map((ord) => (
                         <tr key={ord.id} className="hover:bg-slate-50/70">
-                          <td className="p-2.5 font-bold text-slate-900">{ord.order_number}</td>
-                          <td className="p-2.5 text-slate-500">{formatDate(ord.created_at)}</td>
-                          <td className="p-2.5 uppercase text-[10px] font-semibold">{String(ord.pricing_mode || "per_bag").replace(/_/g, " ")}</td>
-                          <td className="p-2.5 font-extrabold text-slate-900">{formatCurrency(ord.total_amount)}</td>
-                          <td className="p-2.5">
+                          <td className="p-2.5 font-bold text-slate-900 whitespace-nowrap">{ord.order_number}</td>
+                          <td className="p-2.5 text-slate-500 whitespace-nowrap">{formatDate(ord.created_at)}</td>
+                          <td className="p-2.5 uppercase text-[10px] font-semibold whitespace-nowrap">{String(ord.pricing_mode || "per_bag").replace(/_/g, " ")}</td>
+                          <td className="p-2.5 font-extrabold text-slate-900 whitespace-nowrap">{formatCurrency(ord.total_amount)}</td>
+                          <td className="p-2.5 whitespace-nowrap">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
                               {String(ord.order_status || "pending").replace(/_/g, " ")}
                             </span>

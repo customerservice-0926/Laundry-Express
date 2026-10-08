@@ -67,7 +67,7 @@ export function Navbar() {
             </div>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-7 text-sm font-semibold">
+          <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-sm font-semibold">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
@@ -86,7 +86,7 @@ export function Navbar() {
             })}
           </nav>
 
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2.5 xl:gap-3">
             {!mounted || !isAuthenticated ? (
               <Link href="/login">
                 <Button
