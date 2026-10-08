@@ -1,3 +1,4 @@
+import * as React from "react";
 import { ShoppingBag, Scale, Sparkles, Gift } from "lucide-react";
 import type { PricingMode } from "@/types";
 import { cn } from "@/lib/utils";
@@ -60,7 +61,7 @@ export function StepPricingMode({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-amber-500" />
+        <Sparkles className="h-5 w-5 text-amber-500 shrink-0" />
         <h4 className="text-base font-bold text-slate-900">
           Step 1: Choose Your Laundry Service Model
         </h4>
@@ -77,9 +78,9 @@ export function StepPricingMode({
               type="button"
               onClick={() => onSelectMode(mode.id)}
               className={cn(
-                "relative text-left p-5 rounded-2xl border-2 transition-all duration-200 flex flex-col justify-between",
+                "relative text-left p-5 rounded-2xl border-2 transition-all duration-200 flex flex-col justify-between cursor-pointer",
                 isSelected
-                  ? "border-sky-600 bg-sky-50/70 shadow-md ring-2 ring-sky-500/20"
+                  ? "border-primary bg-pink-50/50 shadow-md ring-2 ring-primary/20"
                   : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
               )}
             >
@@ -87,17 +88,17 @@ export function StepPricingMode({
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div
                     className={cn(
-                      "p-2.5 rounded-xl",
-                      isSelected ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-700"
+                      "p-2.5 rounded-xl shrink-0",
+                      isSelected ? "bg-primary text-white" : "bg-slate-100 text-slate-700"
                     )}
                   >
                     <Icon className="h-5 w-5" />
                   </div>
                   <span
                     className={cn(
-                      "text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border",
+                      "text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border shrink-0",
                       isSelected
-                        ? "bg-rose-100 text-rose-700 border-rose-200"
+                        ? "bg-pink-100 text-pink-800 border-pink-200"
                         : "bg-slate-100 text-slate-600 border-slate-200"
                     )}
                   >
@@ -112,11 +113,11 @@ export function StepPricingMode({
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                <span className="font-extrabold text-sm text-sky-700">{mode.priceLabel}</span>
+                <span className="font-extrabold text-sm text-primary">{mode.priceLabel}</span>
                 <span
                   className={cn(
-                    "h-4 w-4 rounded-full border flex items-center justify-center",
-                    isSelected ? "border-sky-600 bg-sky-600" : "border-slate-300 bg-white"
+                    "h-4 w-4 rounded-full border flex items-center justify-center shrink-0",
+                    isSelected ? "border-primary bg-primary" : "border-slate-300 bg-white"
                   )}
                 >
                   {isSelected && <span className="h-2 w-2 rounded-full bg-white" />}

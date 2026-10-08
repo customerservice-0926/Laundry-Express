@@ -34,7 +34,7 @@ export function useBookingCheckout() {
   const checkout = async (p: CheckoutPayload) => {
     setIsProcessing(true);
     setCheckoutError("");
-    const delivery = p.dropoffDate || new Date(Date.now() + 24 * 3600 * 1000).toISOString().split("T")[0];
+    const delivery = p.dropoffDate && p.dropoffDate.trim() ? p.dropoffDate.trim() : undefined;
     const weightAmount = p.weightLbs ?? 15;
 
     try {

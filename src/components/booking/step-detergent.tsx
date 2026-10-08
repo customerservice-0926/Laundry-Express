@@ -52,7 +52,9 @@ export function StepDetergent({
             Choose Wash Detergent Formula *
           </label>
           {!selectedDetergentId && (
-            <span className="text-[11px] font-bold text-rose-500">Selection Required</span>
+            <span className={cn("text-[11px] font-bold", showError ? "text-rose-500" : "text-slate-400")}>
+              {showError ? "Selection Required" : "Required"}
+            </span>
           )}
         </div>
 

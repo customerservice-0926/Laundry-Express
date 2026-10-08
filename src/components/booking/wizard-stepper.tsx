@@ -76,7 +76,7 @@ export function WizardStepper({ steps, currentStep, onStepClick }: WizardStepper
                   onClick={() => num < currentStep && onStepClick(num)}
                   title={label}
                   className={cn(
-                    "flex flex-col items-center gap-1.5 shrink-0 transition-all",
+                    "flex flex-col items-center gap-1.5 shrink-0 transition-all max-w-21 md:max-w-25",
                     num < currentStep ? "cursor-pointer group" : "cursor-default"
                   )}
                 >
@@ -94,7 +94,7 @@ export function WizardStepper({ steps, currentStep, onStepClick }: WizardStepper
                   </div>
                   <span
                     className={cn(
-                      "text-[11px] font-bold text-center leading-tight transition-colors",
+                      "text-[11px] font-bold text-center leading-tight transition-colors line-clamp-2",
                       active ? "text-primary" : done ? "text-slate-700 group-hover:text-primary" : "text-slate-400"
                     )}
                   >
@@ -104,7 +104,7 @@ export function WizardStepper({ steps, currentStep, onStepClick }: WizardStepper
                 {i < steps.length - 1 && (
                   <div
                     className={cn(
-                      "flex-1 h-0.5 transition-all mx-2",
+                      "flex-1 h-0.5 transition-all mx-1.5 sm:mx-2 self-start mt-4",
                       currentStep > i + 1 ? "bg-primary" : "bg-slate-200"
                     )}
                   />

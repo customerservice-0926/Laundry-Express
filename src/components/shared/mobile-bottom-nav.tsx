@@ -36,12 +36,6 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-/**
- * MobileBottomNav Component
- *
- * Provides a mobile-native bottom navigation bar for smartphone and compact tablet viewports.
- * Strict accessibility standards, touch targets >= 44px, and safe area padding.
- */
 export function MobileBottomNav() {
   const pathname = usePathname();
 
@@ -65,7 +59,7 @@ export function MobileBottomNav() {
                 key={item.href}
                 href={item.href}
                 aria-label={`Go to ${item.name}`}
-                className="relative -top-3 flex flex-col items-center group focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-full"
+                className="relative -top-3 flex flex-col items-center group focus:outline-none focus:ring-2 focus:ring-primary rounded-full"
               >
                 <div className="h-12 w-12 rounded-full bg-primary hover:bg-primary-dark flex items-center justify-center text-white shadow-lg shadow-primary/40 group-active:scale-95 transition-all">
                   <Icon className="h-5 w-5 animate-pulse" />
@@ -83,22 +77,22 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
-              className={`flex flex-col items-center justify-center min-h-[44px] min-w-[56px] px-2 py-1 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+              className={`flex flex-col items-center justify-center min-h-11 min-w-14 px-2 py-1 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
                 isActive
-                  ? "text-sky-600 font-bold"
+                  ? "text-primary font-bold"
                   : "text-slate-600 font-medium hover:text-slate-800"
               }`}
             >
               <Icon
                 className={`h-5 w-5 mb-1 transition-transform ${
-                  isActive ? "scale-110 text-sky-600" : "text-slate-500"
+                  isActive ? "scale-110 text-primary" : "text-slate-500"
                 }`}
               />
               <span className="text-[11px] leading-tight tracking-tight">
                 {item.name}
               </span>
               {isActive ? (
-                <span className="h-1 w-1 rounded-full bg-sky-600 mt-0.5" />
+                <span className="h-1 w-1 rounded-full bg-primary mt-0.5" />
               ) : (
                 <span className="h-1 w-1 mt-0.5 opacity-0" />
               )}
@@ -109,4 +103,3 @@ export function MobileBottomNav() {
     </nav>
   );
 }
-
