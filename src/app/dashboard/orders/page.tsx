@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Camera, RotateCcw, Filter } from "lucide-react";
+import { Camera, RotateCcw, Filter, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { useAuth } from "@/context/auth-context";
 import { DashboardPageLayout } from "@/components/dashboard/dashboard-page-layout";
 import { OrderPipeline } from "@/components/admin/order-pipeline";
 import { CustomerOrderDetailModal } from "@/components/dashboard/customer-order-detail-modal";
+import { ManualOrderModal } from "@/components/admin/manual-order-modal";
 import { useOrdersRealtime } from "@/hooks/use-orders-realtime";
 import type { Order, OrderStatus } from "@/types";
 
@@ -22,6 +23,7 @@ export default function OrdersUnifiedPage() {
   const [ordersError, setOrdersError] = React.useState("");
   const [liveAlert, setLiveAlert] = React.useState<string | null>(null);
   const [checkoutStatus, setCheckoutStatus] = React.useState<"pending" | "confirmed" | "failed" | "cancelled" | null>(null);
+  const [isManualModalOpen, setIsManualModalOpen] = React.useState(false);
 
   const refreshSilently = React.useCallback(async () => {
     try {
@@ -132,6 +134,18 @@ export default function OrdersUnifiedPage() {
       activeSection="orders"
       title={isAdmin ? "Orders & Fulfillment Pipeline" : "My Orders & Journey Tracking"}
       subtitle={isAdmin ? "Track laundry dispatches, photo proofs, and live machine wash progress" : "Inspect your real-time 4-stage order journey and verified photo proofs"}
+      actions={
+        isAdmin ? (
+          <Button
+            size="sm"
+            onClick={() => setIsManualModalOpen(true)}
+            className="bg-primary hover:bg-primary-dark text-white text-xs h-8 shadow-xs font-bold"
+          >
+            <PhoneCall className="h-3.5 w-3.5 mr-1" />
+            <span>New Phone Order</span>
+          </Button>
+        ) : undefined
+      }
     >
       {liveAlert && (
         <div role="status" className="mb-4 rounded-xl border border-pink-300 bg-pink-50 p-3 text-xs font-bold text-primary flex items-center justify-between shadow-xs">
@@ -149,7 +163,12 @@ export default function OrdersUnifiedPage() {
         </div>
       )}
       {isAdmin ? (
-        <OrderPipeline orders={orders} onUpdateStatus={handleUpdateStatus} onUploadProof={handleUploadProof} />
+        <OrderPipeline
+          orders={orders}
+          onUpdateStatus={handleUpdateStatus}
+          onUploadProof={handleUploadProof}
+          onOpenManualOrder={() => setIsManualModalOpen(true)}
+        />
       ) : (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-pink-100">
@@ -205,6 +224,15 @@ export default function OrdersUnifiedPage() {
           </div>
           <CustomerOrderDetailModal order={selectedOrder} isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} />
         </div>
+      )}
+      {isAdmin && (
+        <ManualOrderModal
+          isOpen={isManualModalOpen}
+          onClose={() => setIsManualModalOpen(false)}
+          onOrderCreated={(newOrder) => {
+            setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
+          }}
+        />
       )}
     </DashboardPageLayout>
   );

@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     if (!order) {
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
-    if (order.payment_status !== "paid") {
+    if (user.role !== "admin" && order.payment_status !== "paid") {
       return NextResponse.json({ success: false, error: "Invoice is available after payment is confirmed." }, { status: 409 });
     }
     if (

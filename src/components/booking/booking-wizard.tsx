@@ -47,6 +47,7 @@ export function BookingWizard({
   const [selectedDate, setSelectedDate] = React.useState(() => new Date().toISOString().split("T")[0]);
   const [dropoffDate, setDropoffDate] = React.useState("");
   const [selectedSlot, setSelectedSlot] = React.useState<"8am-12pm" | "1pm-6pm">("8am-12pm");
+  const [isSlotValid, setIsSlotValid] = React.useState(true);
   const [isOutOfHome, setIsOutOfHome] = React.useState(false);
   const [isAwayForDropoff, setIsAwayForDropoff] = React.useState(false);
   const [bagConfirmed, setBagConfirmed] = React.useState(false);
@@ -115,7 +116,7 @@ export function BookingWizard({
     (selectedSlot === "1pm-6pm" && nowHour >= slot2EndHour)
   );
 
-  const isStep3Valid = isDateValid && isDropoffValid && Boolean(selectedSlot) && !isSelectedSlotClosed;
+  const isStep3Valid = isSlotValid && isDateValid && isDropoffValid && Boolean(selectedSlot) && !isSelectedSlotClosed;
   const isAddressValid = address.trim().length >= 5 && Boolean(addressDetails?.city.trim()) && (addressDetails?.state.trim() || "IL") === "IL" && /^\d{5}(-\d{4})?$/.test(addressDetails?.zip.trim() || "");
   const isStep4Valid = Boolean(isAddressValid && phoneValue.trim().length >= 7 && (!isOutOfHome || bagConfirmed));
 
@@ -154,10 +155,19 @@ export function BookingWizard({
                 <StepDetergent selectedDetergentId={selectedDetergentId} onSelectDetergent={(id) => { setSelectedDetergentId(id); setShowStep2Errors(false); }} showError={showStep2Errors} detergents={detergents} isLoading={isLoadingDetergents} loadError={detergentError} />
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                   <Button variant="outline" onClick={() => setStep(1)}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
-                  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                    {!isStep2Valid && <span className="text-xs text-rose-500 font-semibold">Selection required</span>}
-                    <Button variant="hero" size="lg" disabled={!isStep2Valid} onClick={() => { if (!isStep2Valid) { setShowStep2Errors(true); return; } setStep(3); }}>Continue to Schedule <ArrowRight className="h-4 w-4 ml-2" /></Button>
-                  </div>
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    onClick={() => {
+                      if (!isStep2Valid) {
+                        setShowStep2Errors(true);
+                        return;
+                      }
+                      setStep(3);
+                    }}
+                  >
+                    Continue to Schedule <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
                 </div>
               </div>
             )}
@@ -177,33 +187,13 @@ export function BookingWizard({
                   operatingDays={settings.operatingDays}
                   closedDates={settings.closedDates}
                   serverTime={serverTime}
+                  onSlotAvailabilityChange={(valid) => setIsSlotValid(valid)}
                 />
-                {!isOperatingDay && (
-                  <p className="text-xs text-rose-600 font-semibold px-1">
-                    Laundry pickup is closed on the selected day of the week. Please choose an active operating day.
-                  </p>
-                )}
-                {isHolidayClosed && (
-                  <p className="text-xs text-rose-600 font-semibold px-1">
-                    Laundry pickup is closed on this date for a scheduled closure. Please choose an open day.
-                  </p>
-                )}
-                {!isDropoffValid && <p className="text-xs text-rose-600 font-semibold px-1">Drop-off date cannot be before pickup date ({selectedDate}).</p>}
-                {isSelectedSlotClosed && (
-                  <p className="text-xs text-rose-600 font-semibold px-1">
-                    The {selectedSlot} pickup window for today is closed. Please select an available window or future date to proceed.
-                  </p>
-                )}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                   <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
-                  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                    {!isStep3Valid && (
-                      <span className="text-xs text-rose-500 font-semibold">
-                        {!isDateValid ? "Choose an open pickup date" : isSelectedSlotClosed ? "Pickup slot closed for today" : "Selection required"}
-                      </span>
-                    )}
-                    <Button variant="hero" size="lg" disabled={!isStep3Valid} onClick={() => isStep3Valid && setStep(4)}>Continue to Address <ArrowRight className="h-4 w-4 ml-2" /></Button>
-                  </div>
+                  <Button variant="hero" size="lg" disabled={!isStep3Valid} onClick={() => isStep3Valid && setStep(4)}>
+                    Continue to Address <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
                 </div>
               </div>
             )}

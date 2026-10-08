@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardPageLayout } from "@/components/dashboard/dashboard-page-layout";
 import { useAuth } from "@/context/auth-context";
 import { AdminOverview } from "@/components/admin/admin-overview";
 import { CustomerOverview } from "@/components/dashboard/customer-overview";
+import { ManualOrderModal } from "@/components/admin/manual-order-modal";
 import { useOrdersRealtime } from "@/hooks/use-orders-realtime";
 import type { Order } from "@/types";
 import type { CustomerAccount } from "@/components/admin/customer-detail-modal";
@@ -17,6 +18,7 @@ export default function DashboardOverviewMasterPage() {
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [customers, setCustomers] = React.useState<CustomerAccount[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isManualModalOpen, setIsManualModalOpen] = React.useState(false);
 
   const fetchOrders = React.useCallback(async () => {
     try {
@@ -77,7 +79,16 @@ export default function DashboardOverviewMasterPage() {
               <span>Book Pickup</span>
             </Button>
           </Link>
-        ) : undefined
+        ) : (
+          <Button
+            size="sm"
+            onClick={() => setIsManualModalOpen(true)}
+            className="bg-primary hover:bg-primary-dark text-white text-xs h-8 shadow-xs font-bold"
+          >
+            <PhoneCall className="h-3.5 w-3.5 mr-1" />
+            <span>New Phone Order</span>
+          </Button>
+        )
       }
     >
       {isLoading ? (
@@ -86,6 +97,16 @@ export default function DashboardOverviewMasterPage() {
         <AdminOverview orders={orders} customers={customers} />
       ) : (
         <CustomerOverview orders={orders} />
+      )}
+      {isAdmin && (
+        <ManualOrderModal
+          isOpen={isManualModalOpen}
+          onClose={() => setIsManualModalOpen(false)}
+          onOrderCreated={(newOrder) => {
+            setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
+            void fetchOrders();
+          }}
+        />
       )}
     </DashboardPageLayout>
   );

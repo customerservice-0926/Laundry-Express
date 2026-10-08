@@ -68,7 +68,7 @@ export default async function OrderPage() {
   ]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-white overflow-x-clip pt-8 md:pt-10">
+    <div className="min-h-screen flex flex-col bg-white overflow-x-clip pt-20 sm:pt-24">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}

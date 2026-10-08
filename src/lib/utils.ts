@@ -95,6 +95,25 @@ export function formatPhone(phone: string): string {
 }
 
 /**
+ * Formats user input as US phone digits while typing: (XXX) XXX-XXXX
+ */
+export function formatPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 10);
+  if (!digits) return "";
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+/**
+ * Strips angle brackets and trims input to prevent XSS / markup injection.
+ */
+export function sanitizeText(text?: string | null): string {
+  if (!text) return "";
+  return text.replace(/[<>]/g, "").trim();
+}
+
+/**
  * Truncates long text gracefully.
  */
 export function truncate(text: string, maxLength: number): string {
