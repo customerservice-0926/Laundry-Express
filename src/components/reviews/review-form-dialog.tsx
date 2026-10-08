@@ -26,6 +26,19 @@ export function ReviewFormDialog({
   const [error, setError] = React.useState<string>("");
   const [success, setSuccess] = React.useState<boolean>(false);
 
+  const resetForm = React.useCallback(() => {
+    setRating(5);
+    setComment("");
+    setPhotos([]);
+    setPhotoFiles([]);
+    setError("");
+    setSuccess(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) resetForm();
+  }, [open, resetForm]);
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -98,7 +111,7 @@ export function ReviewFormDialog({
       if (!response.ok || !result.success) throw new Error(result.error || "Unable to submit your review.");
       setSuccess(true);
       window.setTimeout(() => {
-        setSuccess(false);
+        resetForm();
         onOpenChange(false);
         onSubmitted();
       }, 1400);
@@ -162,7 +175,7 @@ export function ReviewFormDialog({
               placeholder="Tell others how your laundry turned out (cleanliness, fragrance, punctuality)..."
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition"
               required
             />
           </div>

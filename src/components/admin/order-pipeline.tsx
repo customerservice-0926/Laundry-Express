@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Bell, Filter } from "lucide-react";
+import { Bell, Filter, PhoneCall } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { Order, OrderStatus } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { OrderTableRow } from "./order-table-row";
@@ -14,12 +15,14 @@ interface OrderPipelineProps {
   orders: Order[];
   onUpdateStatus: (orderId: string, newStatus: OrderStatus, reason?: string, notes?: string) => Promise<boolean>;
   onUploadProof: (orderId: string, proofType: "pickup" | "dropoff" | "damage", imageUrl: string, notes?: string) => Promise<boolean>;
+  onOpenManualOrder?: () => void;
 }
 
 export function OrderPipeline({
   orders,
   onUpdateStatus,
   onUploadProof,
+  onOpenManualOrder,
 }: OrderPipelineProps) {
   const [selectedOrder, setSelectedOrder] = React.useState<Order | null>(null);
   const [detailOrderId, setDetailOrderId] = React.useState<string | null>(null);
@@ -133,25 +136,37 @@ export function OrderPipeline({
         <div className="font-bold text-slate-700">
           Showing <span className="text-primary font-black">{filteredOrders.length}</span> of {orders.length} orders
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="h-3.5 w-3.5 text-slate-400" />
-          <label htmlFor="admin-order-status-filter" className="font-bold text-slate-500">Status Filter:</label>
-          <select
-            id="admin-order-status-filter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="font-bold px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 cursor-pointer text-xs"
-          >
-            <option value="all">All Statuses ({orders.length})</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="driver_assigned">Driver Assigned</option>
-            <option value="picked_up">Picked Up</option>
-            <option value="in_wash">In Wash</option>
-            <option value="out_for_delivery">Out for Delivery</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {onOpenManualOrder && (
+            <Button
+              size="sm"
+              onClick={onOpenManualOrder}
+              className="bg-primary hover:bg-primary-dark text-white text-xs h-7.5 px-3 font-bold rounded-xl shadow-xs"
+            >
+              <PhoneCall className="h-3.5 w-3.5 mr-1" />
+              <span>+ Phone Order</span>
+            </Button>
+          )}
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3.5 w-3.5 text-slate-400" />
+            <label htmlFor="admin-order-status-filter" className="font-bold text-slate-500">Status:</label>
+            <select
+              id="admin-order-status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="font-bold px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 cursor-pointer text-xs"
+            >
+              <option value="all">All ({orders.length})</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="driver_assigned">Driver Assigned</option>
+              <option value="picked_up">Picked Up</option>
+              <option value="in_wash">In Wash</option>
+              <option value="out_for_delivery">Out for Delivery</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
         </div>
       </div>
 
