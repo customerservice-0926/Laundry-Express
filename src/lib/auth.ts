@@ -37,6 +37,7 @@ declare module "next-auth/jwt" {
     id: string;
     role: "admin" | "customer";
     phone?: string;
+    invalid?: boolean;
   }
 }
 
@@ -187,13 +188,17 @@ export const authOptions: NextAuthOptions = {
           if (!activeUser && token.email) {
             activeUser = await UserDbService.getUserByEmail(String(token.email));
           }
-          if (activeUser) {
+          if (activeUser && activeUser.is_active) {
             token.id = activeUser.id;
             token.role = activeUser.role;
             token.email = activeUser.email;
             token.name = activeUser.full_name;
             token.phone = activeUser.phone || undefined;
             token.picture = activeUser.avatar_url || token.picture;
+            token.invalid = false;
+          } else {
+            token.invalid = true;
+            token.id = "";
           }
         } catch (err) {
           console.error("JWT user refresh error:", err);
@@ -208,6 +213,13 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      if (token.invalid || !token.id) {
+        return {
+          ...session,
+          user: undefined as unknown as typeof session.user,
+          expires: new Date(0).toISOString(),
+        };
+      }
       if (session.user) {
         session.user.id = (token.id as string) || (token.sub as string) || "";
         session.user.role = (token.role as "admin" | "customer") || "customer";
