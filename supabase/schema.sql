@@ -307,6 +307,7 @@ CREATE TABLE IF NOT EXISTS public.auth_rate_limits (
     window_ends_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_window_ends_at ON public.auth_rate_limits(window_ends_at);
 
 CREATE OR REPLACE FUNCTION public.consume_auth_rate_limit(
     key_input TEXT,
@@ -324,7 +325,7 @@ BEGIN
     IF max_hits < 1 OR window_seconds < 1 THEN
         RAISE EXCEPTION 'Invalid rate limit configuration';
     END IF;
-    DELETE FROM public.auth_rate_limits WHERE window_ends_at < now() - interval '1 day';
+    DELETE FROM public.auth_rate_limits WHERE window_ends_at < now() - interval '1 hour';
 
     INSERT INTO public.auth_rate_limits(rate_key, hits, window_ends_at)
     VALUES (key_input, 1, now() + make_interval(secs => window_seconds))

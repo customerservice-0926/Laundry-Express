@@ -25,8 +25,10 @@ export async function proxy(req: NextRequest) {
   const token = isAdminRoute || isOrderRoute || isDashboardRoute || isAuthRoute
     ? await getToken({ req, secret: getAuthSecret() })
     : null;
-  const isAuthenticated = Boolean(token && (token.id || token.email || token.sub));
-  const isAdmin = token?.role === "admin";
+  const isAuthenticated = Boolean(
+    token && !token.invalid && (token.id || token.email || token.sub) && token.id !== ""
+  );
+  const isAdmin = Boolean(isAuthenticated && token?.role === "admin");
 
   // 1. Guard legacy /admin routes - strictly require admin role
   if (isAdminRoute) {

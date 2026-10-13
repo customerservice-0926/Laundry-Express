@@ -50,19 +50,27 @@ function AuthStateBridge({ children }: { children: React.ReactNode }) {
           cache: "no-store",
           signal: controller.signal,
         });
-        if (response.status === 401) {
-          if (verifiedProfile) {
-            setVerifiedProfile(null);
-            setProfileFailure(null);
-            await signOut({ callbackUrl: "/login" });
-          }
+        if (response.status === 401 || response.status === 403) {
+          setVerifiedProfile(null);
+          setProfileFailure(null);
+          await signOut({ callbackUrl: "/login?error=session_expired" });
           return;
         }
         if (!response.ok) return;
         const result = await response.json();
-        if (!result?.success || !result.user || disposed) return;
+        if (!result?.success || !result.user || disposed) {
+          if (result?.error && !result?.user) {
+            setVerifiedProfile(null);
+            await signOut({ callbackUrl: "/login?error=session_expired" });
+          }
+          return;
+        }
         const dbUser = result.user as User;
-        if (!dbUser.is_active) throw new Error("Account is no longer active.");
+        if (!dbUser.is_active) {
+          setVerifiedProfile(null);
+          await signOut({ callbackUrl: "/login?error=account_inactive" });
+          return;
+        }
 
         setVerifiedProfile((prev) => {
           if (prev && prev.sessionId === sessionId && prev.user.updated_at === dbUser.updated_at) return prev;

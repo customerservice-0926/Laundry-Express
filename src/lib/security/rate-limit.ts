@@ -27,8 +27,18 @@ function extractClientIp(req?: RequestLike): string {
 
 const memLimits = new Map<string, { count: number; resetAt: number }>();
 
+function pruneExpiredMemLimits(): void {
+  const now = Date.now();
+  if (memLimits.size > 2000) {
+    for (const [k, v] of memLimits.entries()) {
+      if (now > v.resetAt) memLimits.delete(k);
+    }
+  }
+}
+
 function checkMemLimit(key: string, limit: number, windowSeconds: number): boolean {
   const now = Date.now();
+  pruneExpiredMemLimits();
   const entry = memLimits.get(key);
   if (!entry || now > entry.resetAt) {
     memLimits.set(key, { count: 1, resetAt: now + windowSeconds * 1000 });
@@ -48,44 +58,47 @@ export async function consumeRateLimit(
 ): Promise<boolean> {
   const ip = extractClientIp(req);
   const secret = getAuthSecret();
-  const supabase = createAdminSupabaseClient();
 
-  // 1. IP-based rate limit check
+  // 1. Generate cryptographic HMAC identifiers
   const ipKey = crypto.createHmac("sha256", secret).update(`${scope}:ip:${ip}`).digest("hex");
+  const normSubject = subject.trim().toLowerCase();
+  const accKey = normSubject
+    ? crypto.createHmac("sha256", secret).update(`${scope}:account:${normSubject}`).digest("hex")
+    : "";
+
+  // 2. TIER 1: Fast-Path in-memory shield (0.1ms, zero DB queries)
+  // If local memory already records limit exceeded, block immediately without hitting PostgreSQL.
+  if (!checkMemLimit(ipKey, limit, windowSeconds)) {
+    return false;
+  }
+  if (accKey && !checkMemLimit(accKey, limit, windowSeconds)) {
+    return false;
+  }
+
+  // 3. TIER 2: Distributed PostgreSQL synchronization across instances
   try {
+    const supabase = createAdminSupabaseClient();
     const { data: ipAllowed, error: ipError } = await supabase.rpc("consume_auth_rate_limit", {
       key_input: ipKey,
       max_hits: limit,
       window_seconds: windowSeconds,
     });
-    if (ipError) {
-      console.warn(`[rate-limit] RPC unavailable (${ipError.message}), using memory fallback.`);
-      if (!checkMemLimit(ipKey, limit, windowSeconds)) return false;
-    } else if (ipAllowed !== true) {
+    if (!ipError && ipAllowed === false) {
       return false;
     }
-  } catch {
-    if (!checkMemLimit(ipKey, limit, windowSeconds)) return false;
-  }
 
-  // 2. Account/Email subject rate limit check
-  const normSubject = subject.trim().toLowerCase();
-  if (normSubject) {
-    const accKey = crypto.createHmac("sha256", secret).update(`${scope}:account:${normSubject}`).digest("hex");
-    try {
+    if (accKey) {
       const { data: accAllowed, error: accError } = await supabase.rpc("consume_auth_rate_limit", {
         key_input: accKey,
         max_hits: limit,
         window_seconds: windowSeconds,
       });
-      if (accError) {
-        if (!checkMemLimit(accKey, limit, windowSeconds)) return false;
-      } else if (accAllowed !== true) {
+      if (!accError && accAllowed === false) {
         return false;
       }
-    } catch {
-      if (!checkMemLimit(accKey, limit, windowSeconds)) return false;
     }
+  } catch {
+    // If Supabase is momentarily unreachable, the local in-memory tier handles protection.
   }
 
   return true;
