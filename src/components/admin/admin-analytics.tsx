@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { DollarSign, CheckCircle2, TrendingUp, Calendar, ChevronDown } from "lucide-react";
+import { DollarSign, CheckCircle2, TrendingUp, Calendar, ChevronDown, Heart } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { PieChart, type PieSlice } from "@/components/shared/pie-chart";
 import type { Order } from "@/types";
@@ -68,9 +68,10 @@ export function AdminAnalytics({ orders }: AdminAnalyticsProps) {
     const isDone = (s: string) => s === "completed" || s === "delivered";
     const completedOrders = filteredOrders.filter((o) => isDone(o.order_status));
     const activeOrders = filteredOrders.filter((o) => !isDone(o.order_status) && o.order_status !== "cancelled");
-    // Rule: Total revenue strictly calculated ONLY from complete orders
     const totalCompletedRevenue = completedOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
     const aov = completedOrders.length > 0 ? totalCompletedRevenue / completedOrders.length : 0;
+    const totalTips = filteredOrders.reduce((sum, o) => sum + Number(o.tip_amount || 0), 0);
+    const tippedOrdersCount = filteredOrders.filter((o) => Number(o.tip_amount || 0) > 0).length;
 
     const getMode = (o: Order) => (o.pricing_mode || (o as { plan_type?: string }).plan_type || "").toLowerCase();
     const bagOrders = completedOrders.filter((o) => getMode(o).includes("bag"));
@@ -89,6 +90,8 @@ export function AdminAnalytics({ orders }: AdminAnalyticsProps) {
       totalOrdersCount: filteredOrders.length,
       activeDispatches: activeOrders.length,
       aov,
+      totalTips,
+      tippedOrdersCount,
       bagCount: bagOrders.length,
       bagRevenue: bagOrders.reduce((s, o) => s + Number(o.total_amount || 0), 0),
       poundCount: poundOrders.length,
@@ -138,7 +141,7 @@ export function AdminAnalytics({ orders }: AdminAnalyticsProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
         <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/70 space-y-1">
           <div className="flex items-center justify-between text-emerald-800">
             <span className="text-[11px] font-black uppercase tracking-wider">Completed Revenue</span>
@@ -161,11 +164,22 @@ export function AdminAnalytics({ orders }: AdminAnalyticsProps) {
 
         <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200/70 space-y-1">
           <div className="flex items-center justify-between text-purple-800">
-            <span className="text-[11px] font-black uppercase tracking-wider">Average Completed Order</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">Average Order</span>
             <TrendingUp className="h-4 w-4" />
           </div>
           <p className="text-2xl font-black text-purple-950">{formatCurrency(metrics.aov)}</p>
           <span className="text-[11px] text-purple-700 font-medium block">Per delivered wash</span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-200/70 space-y-1">
+          <div className="flex items-center justify-between text-teal-800">
+            <span className="text-[11px] font-black uppercase tracking-wider">Driver &amp; Crew Tips</span>
+            <Heart className="h-4 w-4 text-teal-600" />
+          </div>
+          <p className="text-2xl font-black text-teal-950">{formatCurrency(metrics.totalTips)}</p>
+          <span className="text-[11px] text-teal-700 font-medium block">
+            {metrics.tippedOrdersCount} tipped order{metrics.tippedOrdersCount !== 1 ? "s" : ""}
+          </span>
         </div>
 
         <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/70 space-y-1">

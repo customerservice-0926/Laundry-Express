@@ -6,19 +6,17 @@ import { ShieldCheck, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PricingConfig } from "@/types";
 import { useSettings, useSlot1Label, useSlot2Label } from "@/hooks/use-settings";
-import { usePackagePlans } from "@/hooks/use-package-plans";
 import { useDetergents } from "@/hooks/use-detergents";
 
 interface PlanComparisonProps {
   initialRates?: Partial<PricingConfig>;
 }
 
-type ColumnKey = "bag" | "pound" | "package";
+type ColumnKey = "bag" | "pound";
 
 const COLUMNS: Array<{ key: ColumnKey; label: string; color: string }> = [
   { key: "bag", label: "By the Bag", color: "text-sky-700" },
   { key: "pound", label: "By the Pound", color: "text-slate-800" },
-  { key: "package", label: "Saver Packages", color: "text-rose-700" },
 ];
 
 export function PlanComparison({ initialRates }: PlanComparisonProps) {
@@ -26,7 +24,6 @@ export function PlanComparison({ initialRates }: PlanComparisonProps) {
   const settings = useSettings();
   const slot1 = useSlot1Label(settings);
   const slot2 = useSlot2Label(settings);
-  const { plans } = usePackagePlans();
   const { detergents } = useDetergents();
 
   React.useEffect(() => {
@@ -39,15 +36,7 @@ export function PlanComparison({ initialRates }: PlanComparisonProps) {
   const bagPrice = Number(pricing?.bag_price ?? 0);
   const poundPrice = Number(pricing?.pound_price ?? 0);
   const minLbs = Number(pricing?.min_lbs ?? 0);
-  const deliveryFee = Number(pricing?.standard_delivery_fee ?? 0);
-  const freeBags = Number(pricing?.free_delivery_threshold ?? 0);
-  const freeLbs = Number(pricing?.free_delivery_lbs ?? 0);
 
-  const cheapest = plans.reduce<(typeof plans)[number] | undefined>(
-    (min, p) => (!min || p.discounted_price < min.discounted_price ? p : min),
-    undefined,
-  );
-  const columns = cheapest ? COLUMNS : COLUMNS.filter((c) => c.key !== "package");
   const detergentNames = detergents.filter((d) => d.is_active).map((d) => d.name).join(", ") || "Choose at checkout";
   const windows = `${slot1} or ${slot2} Daily`;
 
@@ -56,29 +45,28 @@ export function PlanComparison({ initialRates }: PlanComparisonProps) {
       feature: "Base Pricing Rate",
       bag: `$${bagPrice.toFixed(2)} / 13-gal bag (about 2 loads)`,
       pound: `$${poundPrice.toFixed(2)} / lb (${minLbs} lbs min)`,
-      package: cheapest
-        ? `From $${cheapest.discounted_price.toFixed(2)} for ${cheapest.capacity} ${cheapest.unit_type === "lb" ? "lbs" : "bags"}`
-        : "",
     },
     {
       feature: "Delivery Fee Policy",
-      bag: `$${deliveryFee.toFixed(2)} under ${freeBags} bags | ${freeBags}+ bags FREE`,
-      pound: `$${deliveryFee.toFixed(2)} under ${freeLbs} lbs | ${freeLbs}+ lbs FREE`,
-      package: "FREE on every package",
+      bag: "100% FREE Pickup & Delivery Always ($0.00)",
+      pound: "100% FREE Pickup & Delivery Always ($0.00)",
     },
-    { feature: "Pickup & Drop-off Windows", bag: windows, pound: windows, package: windows },
-    { feature: "Detergent Choice", bag: detergentNames, pound: detergentNames, package: detergentNames },
+    { feature: "Pickup & Drop-off Windows", bag: windows, pound: windows },
+    { feature: "Detergent Choice", bag: detergentNames, pound: detergentNames },
     {
       feature: "Photo Proof Guarantee",
       bag: "Pickup & drop-off photo",
       pound: "Pickup, scale weight & drop-off photo",
-      package: "Pickup & drop-off photo",
+    },
+    {
+      feature: "Specialty Items & Add-ons",
+      bag: "Uniforms, shoes, and comforters can be added",
+      pound: "Uniforms, shoes, and comforters can be added",
     },
     {
       feature: "Best Suited For",
       bag: "Individuals, couples, weekly family laundry",
-      pound: "Airbnb hosts, heavy duvets, gyms",
-      package: "Frequent wash households & roommates",
+      pound: "Airbnb hosts, heavy duvets, gyms & bulk orders",
     },
   ];
 
@@ -95,7 +83,7 @@ export function PlanComparison({ initialRates }: PlanComparisonProps) {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
                 <th scope="col" className="py-4 px-6 font-bold whitespace-nowrap">Feature</th>
-                {columns.map((c) => (
+                {COLUMNS.map((c) => (
                   <th key={c.key} scope="col" className={`py-4 px-6 font-bold whitespace-nowrap ${c.color}`}>{c.label}</th>
                 ))}
               </tr>
@@ -104,7 +92,7 @@ export function PlanComparison({ initialRates }: PlanComparisonProps) {
               {rows.map((row) => (
                 <tr key={row.feature} className="hover:bg-slate-50/50 transition-colors">
                   <th scope="row" className="py-4 px-6 font-bold text-slate-900 whitespace-nowrap">{row.feature}</th>
-                  {columns.map((c) => (
+                  {COLUMNS.map((c) => (
                     <td key={c.key} className="py-4 px-6 text-slate-700 font-medium break-words">{row[c.key]}</td>
                   ))}
                 </tr>
@@ -119,7 +107,7 @@ export function PlanComparison({ initialRates }: PlanComparisonProps) {
           <div key={row.feature} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2 text-xs">
             <span className="font-bold text-slate-900 block pb-1 border-b border-slate-100">{row.feature}</span>
             <dl className="grid grid-cols-1 gap-1.5 pt-1">
-              {columns.map((c) => (
+              {COLUMNS.map((c) => (
                 <div key={c.key} className="flex justify-between items-start gap-3">
                   <dt className="text-slate-500 font-medium shrink-0">{c.label}</dt>
                   <dd className={`font-semibold text-right break-words min-w-0 ${c.color}`}>{row[c.key]}</dd>

@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { User, Phone, Mail, MapPin, Sparkles, CreditCard, Camera, AlertTriangle, CheckCircle2, Calendar, Scale } from "lucide-react";
+import { User, Phone, Mail, MapPin, Sparkles, CreditCard, Camera, AlertTriangle, Calendar } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
 import { ORDER_STATUSES } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Dialog } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { OrderCancelButton } from "./order-cancel-button";
+import { OrderActionsBar } from "./order-actions-bar";
+import { OrderProofsGallery } from "./order-proofs-gallery";
 
 interface OrderDetailModalProps {
   order: Order | null;
@@ -17,37 +17,22 @@ interface OrderDetailModalProps {
   onUpdateStatus?: (orderId: string, newStatus: OrderStatus, reason?: string, notes?: string) => Promise<boolean>;
   onOpenProofModal?: (order: Order, type: "pickup" | "dropoff" | "damage") => void;
   onWeighOrder?: (order: Order) => void;
+  onOrderUpdated?: (order: Order) => void;
+  onOrderDeleted?: (orderId: string) => void;
   allOrders?: Order[];
 }
 
 export function OrderDetailModal({
-  order, isOpen, onClose, onUpdateStatus, onOpenProofModal, onWeighOrder, allOrders = [],
+  order, isOpen, onClose, onUpdateStatus, onOpenProofModal, onWeighOrder, onOrderUpdated, onOrderDeleted, allOrders = [],
 }: OrderDetailModalProps) {
-  const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
-  const [statusError, setStatusError] = React.useState("");
   if (!order) return null;
 
   const statusMeta = ORDER_STATUSES[order.order_status] || ORDER_STATUSES.pending;
   const detergentName = order.detergent_name || order.detergent_id;
-  const canWeighAndCharge = Boolean(
-    order.pricing_mode === "per_lb" && order.payment_method === "card" && order.payment_status !== "paid" &&
-    (order.stripe_payment_method_id || order.card_last4) && !order.stripe_payment_intent?.startsWith("PHONE-")
-  );
   const userPastOrders = allOrders.filter((o) => (order.customer_email && o.customer_email === order.customer_email) || (order.user_id && o.user_id === order.user_id));
   const prevOrdersCount = userPastOrders.filter((o) => o.id !== order.id).length;
   const lifetimeSpent = userPastOrders.reduce((sum, o) => sum + o.total_amount, 0) || order.total_amount;
   const fullOrderAddress = [order.street_address, order.apt_unit ? `Apt ${order.apt_unit}` : "", order.city, order.state, order.zip_code].filter(Boolean).join(", ") || order.pickup_address || order.user?.address || "Address pending";
-  const acceptOrder = async () => {
-    setIsUpdatingStatus(true); setStatusError("");
-    const ok = onUpdateStatus ? await onUpdateStatus(order.id, "driver_assigned") : false;
-    setIsUpdatingStatus(false);
-    if (ok) onClose(); else setStatusError("The order was not updated. Please try again.");
-  };
-  const cancelOrder = async (reason?: string, notes?: string) => {
-    const ok = onUpdateStatus ? await onUpdateStatus(order.id, "cancelled", reason, notes) : false;
-    if (ok) onClose();
-    return ok;
-  };
 
   return (
     <Dialog
@@ -148,6 +133,14 @@ export function OrderDetailModal({
                   </span>
                 </span>
               </div>
+              {order.additional_items && order.additional_items.length > 0 && (
+                <div className="flex justify-between items-start gap-2">
+                  <span className="text-slate-500 shrink-0">Specialty Items:</span>
+                  <span className="font-semibold text-slate-800 text-right">
+                    {order.additional_items.map((i) => `${i.name} (${i.quantity}x @ $${i.price})`).join(", ")}
+                  </span>
+                </div>
+              )}
 
               {/* Financial Breakdown */}
               <div className="pt-2 border-t border-slate-100 space-y-1">
@@ -155,6 +148,18 @@ export function OrderDetailModal({
                   <span>Subtotal: {formatCurrency(order.subtotal)}</span>
                   <span>Detergent: {Number(order.detergent_fee || 0) === 0 ? "FREE" : `+$${Number(order.detergent_fee).toFixed(2)}`}</span>
                 </div>
+                {Number(order.additional_items_fee || 0) > 0 && (
+                  <div className="flex justify-between text-slate-500 text-[11px]">
+                    <span>Specialty Items:</span>
+                    <span className="font-semibold text-slate-800">+{formatCurrency(order.additional_items_fee || 0)}</span>
+                  </div>
+                )}
+                {Number(order.tip_amount || 0) > 0 && (
+                  <div className="flex justify-between text-slate-500 text-[11px]">
+                    <span>Driver &amp; Crew Tip:</span>
+                    <span className="font-bold text-emerald-600">+{formatCurrency(order.tip_amount || 0)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-slate-500 text-[11px]">
                   <span>Delivery: {order.delivery_fee === 0 ? "FREE ($0.00)" : formatCurrency(order.delivery_fee)}</span>
                   {order.discount_amount > 0 && <span className="text-emerald-600 font-bold">Coupon: -{formatCurrency(order.discount_amount)}</span>}
@@ -176,69 +181,19 @@ export function OrderDetailModal({
           </div>
         </div>
 
-        {/* Card 3: Photo Proofs & Pre-wash Damage Audit */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <div className="flex items-center gap-2 font-bold text-slate-900">
-              <Camera className="h-4 w-4 text-sky-600 shrink-0" />
-              <span>Photo Proof Gallery &amp; Pre-wash Damage Audit</span>
-            </div>
-            <span className="text-[10px] text-slate-400">Total Proofs: {order.proofs?.length || 0}</span>
-          </div>
-
-          {order.has_preexisting_damage && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-xs"><AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" /><span>Pre-Existing Garment Flaw Documented</span></div>
-              <p className="text-[11px] text-rose-800">Notes: {order.damage_notes || "Inspector documented flaw. Customer notified via email."}</p>
-            </div>
-          )}
-
-          {(!order.proofs || order.proofs.length === 0) ? (
-            <p className="text-slate-400 italic text-center py-2">No photo proofs uploaded yet for this order.</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              {order.proofs.map((proof, idx) => (
-                <div key={proof.id || idx} className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 space-y-1 pb-1">
-                  <div className="relative h-20 w-full bg-slate-100">
-                    <Image src={proof.image_url} alt="Order Proof" fill sizes="160px" className="object-cover" unoptimized />
-                  </div>
-                  <div className="px-2">
-                    <span className="font-extrabold uppercase text-[9px] block text-sky-700">
-                      {proof.proof_type === "damage" ? "Pre-wash Damage" : `${proof.proof_type} Proof`}
-                    </span>
-                    <span className="text-[9px] text-slate-400 block truncate">{formatDate(proof.created_at)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Card 3: Photo Proofs Gallery & Damage Audit with Add/Delete/Replace Controls */}
+        <OrderProofsGallery order={order} onOrderUpdated={onOrderUpdated} />
 
         {/* Modal Action Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-          <Button variant="outline" size="sm" onClick={onClose}>Close Inspection</Button>
-          <div className="flex items-center gap-2">
-            {canWeighAndCharge && order.order_status !== "completed" && order.order_status !== "cancelled" && onWeighOrder && (
-              <Button variant="hero" size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => { onClose(); onWeighOrder(order); }}>
-                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Weigh &amp; Charge
-              </Button>
-            )}
-            {onOpenProofModal && order.order_status === "in_wash" && (
-              <Button variant="outline" size="sm" className="text-rose-600 border-rose-200 hover:bg-rose-50" onClick={() => { onClose(); onOpenProofModal(order, "damage"); }}>
-                <AlertTriangle className="h-3.5 w-3.5 mr-1 shrink-0" /> Report Damage
-              </Button>
-            )}
-            {onUpdateStatus && order.order_status === "confirmed" && (
-              <Button variant="hero" size="sm" disabled={isUpdatingStatus} className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { void acceptOrder(); }}>
-                <CheckCircle2 className="h-3.5 w-3.5 mr-1 shrink-0" /> {isUpdatingStatus ? "Updating..." : "Accept Order"}
-              </Button>
-            )}
-            {onUpdateStatus && order.order_status !== "completed" && order.order_status !== "cancelled" && (
-              <OrderCancelButton order={order} disabled={isUpdatingStatus} onCancel={cancelOrder} />
-            )}
-          </div>
-        </div>
-        {statusError && <p role="alert" className="text-xs text-rose-700">{statusError}</p>}
+        <OrderActionsBar
+          order={order}
+          onClose={onClose}
+          onUpdateStatus={onUpdateStatus}
+          onOpenProofModal={onOpenProofModal}
+          onWeighOrder={onWeighOrder}
+          onOrderUpdated={onOrderUpdated}
+          onOrderDeleted={onOrderDeleted}
+        />
       </div>
     </Dialog>
   );

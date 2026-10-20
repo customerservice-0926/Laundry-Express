@@ -28,6 +28,7 @@ export function OrderFlow({ initialPricing }: OrderFlowProps) {
   const initialWeightLbs = weightParam ? Math.max(minLbs, parseFloat(weightParam) || minLbs) : minLbs;
 
   const initialPackageId = packageParam ?? undefined;
+  const initialAddItem = searchParams.get("add_item") || undefined;
 
   if (isLoading || !isAuthenticated || !user) {
     return (
@@ -51,6 +52,7 @@ export function OrderFlow({ initialPricing }: OrderFlowProps) {
         initialBagCount={initialBagCount}
         initialWeightLbs={initialWeightLbs}
         initialPackageId={initialPackageId}
+        initialAddItem={initialAddItem}
         initialPricing={initialPricing}
         currentUser={user}
       />

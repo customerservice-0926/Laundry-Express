@@ -19,6 +19,7 @@ import {
   User as UserIcon,
   ArrowLeft,
   X,
+  Shirt,
 } from "lucide-react";
 import { MascotBadge } from "@/components/shared/mascot-badge";
 
@@ -58,6 +59,7 @@ const ADMIN_NAV: NavItem[] = [
   { id: "customers", href: "/dashboard/customers", label: "Customers", icon: Users, badgeKey: "customers" },
   { id: "transactions", href: "/dashboard/transactions", label: "Transactions", icon: CreditCard },
   { id: "packages", href: "/dashboard/packages", label: "Packages & Bundles", icon: Package },
+  { id: "additional_items", href: "/dashboard/additional-items", label: "Additional Items", icon: Shirt },
   { id: "detergents", href: "/dashboard/detergents", label: "Detergent Catalog", icon: Sparkles },
   { id: "coupons", href: "/dashboard/coupons", label: "Promo Coupons", icon: Tag },
   { id: "reviews", href: "/dashboard/reviews", label: "Review Moderation", icon: MessageSquare, badgeKey: "reviews" },

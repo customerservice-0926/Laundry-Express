@@ -33,6 +33,12 @@ export function CustomerOverview({ orders: initialOrders }: CustomerOverviewProp
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
   }, [orders]);
 
+  const totalTipsGiven = React.useMemo(() => {
+    return orders
+      .filter((o) => o.order_status !== "cancelled")
+      .reduce((sum, o) => sum + Number(o.tip_amount || 0), 0);
+  }, [orders]);
+
   const completedOrders = orders.filter((o) => o.order_status === "completed");
   const inProgressOrders = orders.filter(
     (o) => o.order_status !== "completed" && o.order_status !== "cancelled"
@@ -55,7 +61,9 @@ export function CustomerOverview({ orders: initialOrders }: CustomerOverviewProp
             <CreditCard className="h-4 w-4 text-emerald-600" />
           </div>
           <span className="text-2xl font-black text-slate-900 block">{formatCurrency(totalSpent)}</span>
-          <span className="text-[11px] text-emerald-600 font-semibold block">All transactions settled</span>
+          <span className="text-[11px] text-emerald-600 font-semibold block">
+            {totalTipsGiven > 0 ? `Includes ${formatCurrency(totalTipsGiven)} driver gratuity` : "All transactions settled"}
+          </span>
         </div>
 
         <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs space-y-1">

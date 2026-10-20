@@ -82,6 +82,14 @@ export function CustomerOrderDetailModal({ order, isOpen, onClose }: CustomerOrd
             <div className="flex items-center gap-2 font-bold text-slate-900 border-b border-slate-100 pb-1.5"><Sparkles className="h-4 w-4 text-amber-500 shrink-0" /><span>Wash &amp; Presence Specifications</span></div>
             <div className="flex justify-between"><span className="text-slate-500">Service Plan:</span><span className="font-bold text-slate-900">{planLabel}</span></div>
             <div className="flex justify-between"><span className="text-slate-500">Intake Volume:</span><span className="font-bold text-slate-900">{quantityLabel}</span></div>
+            {order.additional_items && order.additional_items.length > 0 && (
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-slate-500 shrink-0">Specialty Items:</span>
+                <span className="font-bold text-slate-900 text-right">
+                  {order.additional_items.map((i) => `${i.name} (${i.quantity}x)`).join(", ")}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between"><span className="text-slate-500">Detergent Formula:</span><span className="font-bold text-slate-900">{order.detergent_name || resolveDetergentName(order.detergent_id)}</span></div>
             <div className="flex justify-between"><span className="text-slate-500">Doorstep Protocol:</span><span className="font-bold text-slate-900">{order.is_out_of_home ? "Away (Contactless Doorstep)" : "Home (Driver Rings Bell)"}</span></div>
             {order.customer_notes && <p className="p-2 rounded-xl bg-slate-50 text-[11px] text-slate-600 italic border border-slate-100">&ldquo;{order.customer_notes}&rdquo;</p>}
@@ -114,8 +122,20 @@ export function CustomerOrderDetailModal({ order, isOpen, onClose }: CustomerOrd
 
           <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
             <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{formatCurrency(order.subtotal || order.total_amount)}</span></div>
+            {Number(order.additional_items_fee || 0) > 0 && (
+              <div className="flex justify-between text-slate-500">
+                <span>Specialty Items</span>
+                <span className="font-semibold text-slate-800">+{formatCurrency(Number(order.additional_items_fee))}</span>
+              </div>
+            )}
             <div className="flex justify-between text-slate-500"><span>Detergent Formulation</span><span className={Number(order.detergent_fee || 0) === 0 ? "text-emerald-600 font-bold" : "text-slate-900 font-semibold"}>{Number(order.detergent_fee || 0) === 0 ? "FREE (Included)" : `+${formatCurrency(Number(order.detergent_fee))}`}</span></div>
             <div className="flex justify-between text-slate-500"><span>Doorstep Delivery</span><span className={order.delivery_fee === 0 ? "text-emerald-600 font-bold" : ""}>{order.delivery_fee === 0 ? "FREE ($0.00)" : formatCurrency(order.delivery_fee)}</span></div>
+            {Number(order.tip_amount || 0) > 0 && (
+              <div className="flex justify-between text-emerald-600 font-bold">
+                <span>Driver &amp; Team Tip</span>
+                <span>+{formatCurrency(Number(order.tip_amount))}</span>
+              </div>
+            )}
             {order.discount_amount > 0 && <div className="flex justify-between text-emerald-600 font-bold"><span>Discount</span><span>-{formatCurrency(order.discount_amount)}</span></div>}
             {order.stripe_payment_intent && <div className="flex justify-between text-[11px] text-slate-400 pt-0.5 border-t border-slate-100"><span>Stripe Tx ID:</span><span className="font-mono text-slate-700 select-all font-semibold">{order.stripe_payment_intent}</span></div>}
             <div className="flex justify-between font-black text-sm text-slate-900 pt-1 border-t border-slate-200"><span>{order.payment_status === "paid" ? "Total Paid" : "Order Total"}</span><span className="text-primary">{formatCurrency(order.total_amount)}</span></div>

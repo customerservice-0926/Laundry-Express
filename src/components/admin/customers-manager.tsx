@@ -12,26 +12,31 @@ interface CustomersManagerProps {
 }
 
 export function CustomersManager({ customers }: CustomersManagerProps) {
+  const [customerList, setCustomerList] = React.useState<CustomerAccount[]>(customers);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedCustomer, setSelectedCustomer] = React.useState<CustomerAccount | null>(null);
 
+  React.useEffect(() => {
+    setCustomerList(customers);
+  }, [customers]);
+
   const filteredCustomers = React.useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
-    if (!term) return customers;
-    return customers.filter(
+    if (!term) return customerList;
+    return customerList.filter(
       (c) =>
         c.full_name.toLowerCase().includes(term) ||
         c.email.toLowerCase().includes(term) ||
         c.phone.toLowerCase().includes(term) ||
         c.address.toLowerCase().includes(term)
     );
-  }, [customers, searchTerm]);
+  }, [customerList, searchTerm]);
 
-  const totalSpentAcrossAll = customers.reduce(
+  const totalSpentAcrossAll = customerList.reduce(
     (acc, c) => acc + c.orders.reduce((sum, o) => sum + o.total_amount, 0),
     0
   );
-  const repeatCount = customers.filter((c) => c.orders.length > 1).length;
+  const repeatCount = customerList.filter((c) => c.orders.length > 1).length;
 
   return (
     <div className="space-y-6">
@@ -207,6 +212,14 @@ export function CustomersManager({ customers }: CustomersManagerProps) {
         customer={selectedCustomer}
         isOpen={!!selectedCustomer}
         onClose={() => setSelectedCustomer(null)}
+        onCustomerUpdated={(updated) => {
+          setCustomerList((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+          setSelectedCustomer(updated);
+        }}
+        onCustomerDeleted={(customerId) => {
+          setCustomerList((prev) => prev.filter((c) => c.id !== customerId));
+          setSelectedCustomer(null);
+        }}
       />
     </div>
   );

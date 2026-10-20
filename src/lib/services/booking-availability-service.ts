@@ -72,9 +72,10 @@ export async function validateOrderAvailability(input: AvailabilityCheckInput): 
     if (!match) return false;
     const zoneCity = match[1].trim().toLowerCase();
     const zoneZip = match[2]?.trim();
-    return zoneZip
-      ? zoneZip === inputZip && zoneCity === inputCity
-      : zoneCity === inputCity || zoneCity === inputZip;
+    return Boolean(
+      (zoneZip && inputZip && zoneZip === inputZip) ||
+      (zoneCity && inputCity && zoneCity === inputCity)
+    );
   });
 
   if (!isCovered) {

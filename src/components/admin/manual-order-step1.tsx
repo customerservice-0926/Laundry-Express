@@ -2,15 +2,28 @@
 
 import * as React from "react";
 import { User, Phone, Mail, MapPin } from "lucide-react";
-import { formatPhoneInput } from "@/lib/utils";
+import { formatPhoneInput, cn } from "@/lib/utils";
 import type { ManualOrderFormState, ManualOrderFieldChange } from "./manual-order-types";
 
 interface Step1Props {
   form: ManualOrderFormState;
   onChange: ManualOrderFieldChange;
+  deliveryZones?: { city: string; zip: string }[];
 }
 
-export function ManualOrderStep1({ form, onChange }: Step1Props) {
+export function ManualOrderStep1({ form, onChange, deliveryZones = [] }: Step1Props) {
+  const isCovered = React.useMemo(() => {
+    if (!deliveryZones.length) return true;
+    const cleanZip = (form.zip_code || "").trim();
+    const cleanCity = (form.city || "").trim().toLowerCase();
+    return deliveryZones.some((z) => {
+      const zZip = (z.zip || "").trim();
+      const zCity = (z.city || "").trim().toLowerCase();
+      if (zZip && cleanZip) return zZip === cleanZip;
+      return zCity === cleanCity;
+    });
+  }, [deliveryZones, form.zip_code, form.city]);
+
   return (
     <div className="space-y-4 py-1">
       {/* Customer Identity Section */}
@@ -46,7 +59,7 @@ export function ManualOrderStep1({ form, onChange }: Step1Props) {
                 required
                 value={form.customer_phone}
                 onChange={(e) => onChange("customer_phone", formatPhoneInput(e.target.value))}
-                placeholder="(555) 234-5678"
+                placeholder="(815) 555-0199"
                 maxLength={14}
                 className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
               />
@@ -88,7 +101,7 @@ export function ManualOrderStep1({ form, onChange }: Step1Props) {
               required
               value={form.street_address}
               onChange={(e) => onChange("street_address", e.target.value)}
-              placeholder="123 Oak Grove St"
+              placeholder="e.g. 742 Evergreen Terrace"
               className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
             />
           </div>
@@ -117,7 +130,7 @@ export function ManualOrderStep1({ form, onChange }: Step1Props) {
               required
               value={form.city}
               onChange={(e) => onChange("city", e.target.value)}
-              placeholder="Dallas"
+              placeholder="Lake in the Hills"
               className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
             />
           </div>
@@ -130,7 +143,7 @@ export function ManualOrderStep1({ form, onChange }: Step1Props) {
               required
               value={form.state}
               onChange={(e) => onChange("state", e.target.value.toUpperCase())}
-              placeholder="TX"
+              placeholder="IL"
               maxLength={2}
               className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition uppercase"
             />
@@ -144,12 +157,50 @@ export function ManualOrderStep1({ form, onChange }: Step1Props) {
               required
               value={form.zip_code}
               onChange={(e) => onChange("zip_code", e.target.value.replace(/\D/g, "").slice(0, 5))}
-              placeholder="75201"
+              placeholder="60156"
               maxLength={5}
               className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
             />
           </div>
         </div>
+
+        {form.zip_code.trim().length >= 5 && (
+          <div
+            className={cn(
+              "p-3 rounded-xl border text-xs flex items-center justify-between gap-2 transition-all mt-2",
+              isCovered
+                ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                : "bg-rose-50/80 border-rose-200 text-rose-900"
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "h-2.5 w-2.5 rounded-full shrink-0",
+                  isCovered ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-rose-500 ring-2 ring-rose-200"
+                )}
+              />
+              <div>
+                <p className="font-bold text-[11px]">
+                  {isCovered ? "Serviceable Delivery Area" : "Outside Configured Delivery Area"}
+                </p>
+                <p className="text-[10px] opacity-80">
+                  {isCovered
+                    ? "Address matches active delivery zone."
+                    : `Active zones: ${deliveryZones.map((z) => z.zip ? `${z.city} (${z.zip})` : z.city).join(", ") || "None configured"}`}
+                </p>
+              </div>
+            </div>
+            <span
+              className={cn(
+                "text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shrink-0",
+                isCovered ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+              )}
+            >
+              {isCovered ? "Serviceable" : "Not Covered"}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ export interface GoogleMapProps {
 }
 
 export function GoogleMap({
-  title = "Lake in the Hills & 30-Mile Service Area",
+  title = "Active Delivery Coverage Area",
   className = "",
 }: GoogleMapProps) {
   const embedUrl =
@@ -26,7 +26,7 @@ export function GoogleMap({
         referrerPolicy="no-referrer-when-downgrade"
       />
 
-      {/* Visual Shaded 30-Mile Service-Radius Representation */}
+      {/* Visual Service Coverage Indicator */}
       <div
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none flex items-center justify-center z-10"
@@ -34,7 +34,7 @@ export function GoogleMap({
         <div className="w-[340px] h-[340px] sm:w-[420px] sm:h-[420px] rounded-full border-2 border-dashed border-primary/70 bg-primary/10 shadow-[0_0_30px_var(--primary-ghost)] animate-pulse flex items-center justify-center">
           <div className="bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-primary-pale shadow-md text-[11px] font-black text-primary-dark flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-primary" />
-            <span>30-Mile Service Coverage Zone</span>
+            <span>Active Service Coverage Area</span>
           </div>
         </div>
       </div>

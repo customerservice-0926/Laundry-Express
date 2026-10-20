@@ -13,6 +13,9 @@ export interface UnifiedInvoiceInput {
   subtotal?: number;
   detergentFee?: number;
   deliveryFee?: number;
+  additionalItemsFee?: number;
+  additionalItems?: { name: string; price: number; quantity: number }[];
+  tipAmount?: number;
   discountAmount?: number;
   transactionId?: string;
   customerName: string;
@@ -62,6 +65,10 @@ export function generateInvoiceHtml(inv: UnifiedInvoiceInput): string {
   const detergentName = escapeHtml(resolveDetergentName(rawDetergent));
   const detergentFee = Number(inv.detergentFee || 0);
   const deliveryFee = Number(inv.deliveryFee || 0);
+  const additionalItemsFee = Number(inv.additionalItemsFee || (inv as unknown as { additional_items_fee?: number }).additional_items_fee || 0);
+  const tipAmount = Number(inv.tipAmount || (inv as unknown as { tip_amount?: number }).tip_amount || 0);
+  const rawItems = inv.additionalItems || (inv as unknown as { additional_items?: { name: string; price: number; quantity: number }[] }).additional_items;
+  const additionalItems = Array.isArray(rawItems) ? rawItems : [];
   const subtotal = inv.subtotal !== undefined ? Number(inv.subtotal) : Number(inv.totalAmount);
   const discountAmount = Number(inv.discountAmount || 0);
   const totalAmount = Number(inv.totalAmount || 0);
@@ -143,14 +150,17 @@ export function generateInvoiceHtml(inv: UnifiedInvoiceInput): string {
             <tr bgcolor="#f8fafc"><td style="padding:9px 14px;font-size:10px;font-weight:800;color:#475569;text-transform:uppercase">Service Breakdown</td><td align="right" style="padding:9px 14px;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase">Details</td></tr>
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:10px 14px;color:#64748b;font-weight:600;font-size:12px">Selected Plan</td><td align="right" style="padding:10px 14px;font-weight:800;color:#0f172a;font-size:12px">${planName}</td></tr>
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:10px 14px;color:#64748b;font-weight:600;font-size:12px">Order Intake Quantity</td><td align="right" style="padding:10px 14px;font-weight:700;color:#0f172a;font-size:12px">${quantity}</td></tr>
+            ${additionalItems.length > 0 ? `<tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:10px 14px;color:#64748b;font-weight:600;font-size:12px">Specialty Add-ons</td><td align="right" style="padding:10px 14px;color:#0f172a;font-weight:600;font-size:12px">${additionalItems.map(i => `${escapeHtml(i.name)} (${i.quantity}x)`).join(", ")}</td></tr>` : ""}
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:10px 14px;color:#64748b;font-weight:600;font-size:12px">Formula &amp; Care</td><td align="right" style="padding:10px 14px;color:#0f172a;font-weight:600;font-size:12px">${detergentName} &bull; Cold Care (${detergentFee === 0 ? "Included Free" : formatCurrency(detergentFee)})</td></tr>
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:10px 14px;color:#64748b;font-weight:600;font-size:12px">Doorstep Protocol</td><td align="right" style="padding:10px 14px;color:#0f172a;font-weight:600;font-size:12px">${specialRequest}</td></tr>
           </table>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:18px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
             <tr bgcolor="#f8fafc"><td style="padding:9px 14px;font-size:10px;font-weight:800;color:#475569;text-transform:uppercase">Financial Settlement</td><td align="right" style="padding:9px 14px;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase">Amount</td></tr>
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#64748b;font-size:12px">Service Subtotal</td><td align="right" style="padding:9px 14px;font-weight:700;color:#1e293b;font-size:12px">${formatCurrency(subtotal)}</td></tr>
+            ${additionalItemsFee > 0 ? `<tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#64748b;font-size:12px">Specialty Additional Items</td><td align="right" style="padding:9px 14px;font-weight:700;color:#1e293b;font-size:12px">+${formatCurrency(additionalItemsFee)}</td></tr>` : ""}
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#64748b;font-size:12px">Detergent Formulation Fee</td><td align="right" style="padding:9px 14px;font-weight:700;color:${detergentFee === 0 ? "#047857" : "#1e293b"};font-size:12px">${detergentFee === 0 ? "FREE (Included)" : formatCurrency(detergentFee)}</td></tr>
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#64748b;font-size:12px">Doorstep Logistics (Pickup &amp; Return)</td><td align="right" style="padding:9px 14px;font-weight:700;color:${deliveryFee === 0 ? "#047857" : "#1e293b"};font-size:12px">${deliveryFee === 0 ? "FREE ($0.00)" : formatCurrency(deliveryFee)}</td></tr>
+            ${tipAmount > 0 ? `<tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#047857;font-weight:700;font-size:12px">Driver &amp; Team Tip</td><td align="right" style="padding:9px 14px;font-weight:800;color:#047857;font-size:12px">+${formatCurrency(tipAmount)}</td></tr>` : ""}
             ${discountAmount > 0 ? `<tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#047857;font-weight:700;font-size:12px">Promotional Discount</td><td align="right" style="padding:9px 14px;font-weight:800;color:#047857;font-size:12px">-${formatCurrency(discountAmount)}</td></tr>` : ""}
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#64748b;font-size:12px">Payment Method</td><td align="right" style="padding:9px 14px;font-weight:700;color:#1e293b;font-size:12px">${paymentDisplay}</td></tr>
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#64748b;font-size:12px">Stripe Transaction ID</td><td align="right" style="padding:9px 14px;font-weight:700;color:#334155;font-family:monospace;font-size:10px">${txId}</td></tr>

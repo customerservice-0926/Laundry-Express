@@ -37,11 +37,16 @@ export const metadata: Metadata = {
  * Main navigation stays static as users scroll.
  */
 import { PricingPlanService } from "@/lib/services/pricing-plan-service";
+import { AdditionalItemService } from "@/lib/services/additional-item-service";
+import { AdditionalItemsPricingGrid } from "@/components/pricing/additional-items-pricing-grid";
 import { formatCurrency } from "@/lib/utils";
 import { getBreadcrumbSchema, getServiceSchema, serializeJsonLd } from "@/lib/seo/jsonld-schemas";
 
 export default async function PricingPage() {
-  const pricing = await PricingPlanService.getPricing().catch(() => null);
+  const [pricing, additionalItems] = await Promise.all([
+    PricingPlanService.getPricing().catch(() => null),
+    AdditionalItemService.getItems().catch(() => []),
+  ]);
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", path: "/" },
     { name: "Plans & Pricing", path: "/pricing" },
@@ -99,10 +104,16 @@ export default async function PricingPage() {
             </div>
           </div>
 
-          {/* Interactive Plan Selector: Bags vs Pounds vs Packages */}
+          {/* Interactive Plan Selector: Bags vs Pounds vs Packages vs Specialty Items */}
           {pricing ? (
             <>
               <PlanSelector initialRates={pricing} />
+
+              {/* Dedicated Additional & Specialty Items Catalog Section */}
+              <div id="additional-items" className="pt-4 border-t border-slate-100">
+                <AdditionalItemsPricingGrid initialItems={additionalItems} />
+              </div>
+
               <PlanComparison initialRates={pricing} />
             </>
           ) : (

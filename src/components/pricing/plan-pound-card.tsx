@@ -47,9 +47,9 @@ export function PlanPoundCard({ weightLbs, onWeightLbsChange, initialRates }: Pl
 
   const effectiveWeight = Math.max(rates.minLbs, Math.min(rates.maxLbs, weightLbs));
   const subtotal = Math.round(effectiveWeight * rates.poundPrice * 100) / 100;
-  const isFreeDelivery = effectiveWeight >= rates.freeDeliveryLbs;
-  const deliveryFee = isFreeDelivery ? 0.0 : rates.deliveryFee;
-  const total = subtotal + deliveryFee;
+  const isFreeDelivery = true;
+  const deliveryFee = 0.0;
+  const total = subtotal;
 
   return (
     <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-sky-200 shadow-xl max-w-2xl mx-auto space-y-6 animate-in fade-in duration-200">
@@ -110,10 +110,8 @@ export function PlanPoundCard({ weightLbs, onWeightLbsChange, initialRates }: Pl
           <span className="font-semibold text-slate-900">{formatCurrency(subtotal)}</span>
         </div>
         <div className="flex justify-between items-center">
-          <span>Delivery Fee ({rates.freeDeliveryLbs}+ lbs Free):</span>
-          <span className={`font-bold ${isFreeDelivery ? "text-emerald-600" : "text-slate-900"}`}>
-            {isFreeDelivery ? "FREE ($0.00)" : formatCurrency(rates.deliveryFee)}
-          </span>
+          <span>Doorstep Pickup &amp; Delivery:</span>
+          <span className="font-bold text-emerald-600">FREE ($0.00)</span>
         </div>
         <div className="flex justify-between pt-3 border-t border-slate-200 text-base font-black text-slate-900">
           <span>Estimated Total:</span>

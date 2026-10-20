@@ -22,29 +22,22 @@ function InvoiceRow({ label, value, mono }: { label: string; value: React.ReactN
 }
 
 export function OrderInvoiceCard({ invoice, className = "" }: OrderInvoiceCardProps) {
-  const methodLabel: Record<string, string> = {
-    card: "Credit / Debit Card (Stripe)",
-    apple_pay: "Apple Pay (Stripe)",
-    google_pay: "Google Pay (Stripe)",
-    stripe: "Stripe 256-bit Secure Checkout",
-  };
-
-  const paymentKey = (invoice.paymentMethod || "card").toLowerCase();
-  const paymentDisplay = methodLabel[paymentKey] || invoice.paymentMethod || "Credit / Debit Card (Stripe)";
-
+  const methodLabel: Record<string, string> = { card: "Credit / Debit Card (Stripe)", apple_pay: "Apple Pay (Stripe)", google_pay: "Google Pay (Stripe)", stripe: "Stripe 256-bit Secure Checkout" };
+  const paymentDisplay = methodLabel[(invoice.paymentMethod || "card").toLowerCase()] || invoice.paymentMethod || "Credit / Debit Card (Stripe)";
   const rawDetergent = invoice.orderDetails?.detergent || invoice.detergent || "Hypoallergenic Eco-Wash";
   const detergentName = resolveDetergentName(rawDetergent);
   const detergentFee = Number(invoice.detergentFee || 0);
-
   const planName = invoice.orderDetails?.planName || invoice.planName || "Wash & Fold Service";
   const quantity = invoice.orderDetails?.quantity || invoice.quantity || "1 Order";
   const specialRequest = invoice.orderDetails?.specialRequest || invoice.specialRequest || "Contactless Delivery";
-
   const subtotal = invoice.subtotal !== undefined ? Number(invoice.subtotal) : Number(invoice.totalAmount);
   const deliveryFee = Number(invoice.deliveryFee || 0);
   const discountAmount = Number(invoice.discountAmount || 0);
   const totalAmount = Number(invoice.totalAmount || 0);
-
+  const additionalItemsFee = Number(invoice.additionalItemsFee || (invoice as unknown as { additional_items_fee?: number }).additional_items_fee || 0);
+  const tipAmount = Number(invoice.tipAmount || (invoice as unknown as { tip_amount?: number }).tip_amount || 0);
+  const rawAddl = invoice.additionalItems || (invoice as unknown as { additional_items?: { name: string; price: number; quantity: number }[] }).additional_items;
+  const additionalItems = Array.isArray(rawAddl) ? rawAddl : [];
   const orderId = invoice.orderId || invoice.orderNumber || "LX-ORDER";
   const txId = invoice.transactionId || `STRIPE-TX-${orderId.replace(/[^A-Za-z0-9]/g, "").slice(-8).toUpperCase()}`;
 
@@ -157,6 +150,12 @@ export function OrderInvoiceCard({ invoice, className = "" }: OrderInvoiceCardPr
           <div className="px-4 divide-y divide-slate-100">
             <InvoiceRow label="Selected Plan" value={<span className="text-slate-900 font-black">{planName}</span>} />
             <InvoiceRow label="Order Intake Quantity" value={quantity} />
+            {additionalItems.length > 0 && (
+              <InvoiceRow
+                label="Specialty Add-ons"
+                value={additionalItems.map((i) => `${i.name} (${i.quantity}x)`).join(", ")}
+              />
+            )}
             <InvoiceRow
               label="Formula & Care"
               value={`${detergentName} • Cold Water Care (${detergentFee === 0 ? "Included Free" : formatCurrency(detergentFee)})`}
@@ -173,26 +172,26 @@ export function OrderInvoiceCard({ invoice, className = "" }: OrderInvoiceCardPr
           </div>
           <div className="px-4 divide-y divide-slate-100">
             <InvoiceRow label="Service Subtotal" value={formatCurrency(subtotal)} />
+            {additionalItemsFee > 0 && (
+              <InvoiceRow
+                label="Specialty Additional Items"
+                value={<span className="text-slate-900 font-bold">+{formatCurrency(additionalItemsFee)}</span>}
+              />
+            )}
             <InvoiceRow
               label="Detergent Formulation Fee"
-              value={
-                detergentFee === 0 ? (
-                  <span className="text-emerald-600 font-black">FREE (Included)</span>
-                ) : (
-                  formatCurrency(detergentFee)
-                )
-              }
+              value={detergentFee === 0 ? <span className="text-emerald-600 font-black">FREE (Included)</span> : formatCurrency(detergentFee)}
             />
             <InvoiceRow
               label="Doorstep Logistics (Pickup & Return)"
-              value={
-                deliveryFee === 0 ? (
-                  <span className="text-emerald-600 font-black">FREE ($0.00)</span>
-                ) : (
-                  formatCurrency(deliveryFee)
-                )
-              }
+              value={deliveryFee === 0 ? <span className="text-emerald-600 font-black">FREE ($0.00)</span> : formatCurrency(deliveryFee)}
             />
+            {tipAmount > 0 && (
+              <InvoiceRow
+                label="Driver & Team Tip"
+                value={<span className="text-emerald-600 font-black">+{formatCurrency(tipAmount)}</span>}
+              />
+            )}
             {discountAmount > 0 && (
               <InvoiceRow
                 label="Promotional Discount"

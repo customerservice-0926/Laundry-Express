@@ -28,22 +28,29 @@ export interface NewAddressFormProps {
 }
 
 export function NewAddressForm({
-  currentUser,
-  street, onStreetChange,
-  apt, onAptChange,
-  city, onCityChange,
+  currentUser, street, onStreetChange,
+  apt, onAptChange, city, onCityChange,
   state, zip, onZipChange,
-  deliveryZones = [],
-  showValidationErrors = false,
-  onAddressSaved,
-  hasSavedAddresses = false,
-  onCancelAddNew,
-  editingAddress,
+  deliveryZones = [], showValidationErrors = false,
+  onAddressSaved, hasSavedAddresses = false,
+  onCancelAddNew, editingAddress,
 }: NewAddressFormProps) {
   const [addressLabel, setAddressLabel] = React.useState(editingAddress?.label || "Home");
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [saveError, setSaveError] = React.useState("");
+
+  const isCovered = React.useMemo(() => {
+    if (!deliveryZones.length) return true;
+    const cleanZip = zip.trim();
+    const cleanCity = city.trim().toLowerCase();
+    return deliveryZones.some((z) => {
+      const zCity = (z.city || "").trim().toLowerCase();
+      const zZip = (z.zip || "").trim();
+      if (zZip && cleanZip) return zZip === cleanZip;
+      return zCity === cleanCity;
+    });
+  }, [deliveryZones, zip, city]);
 
   const isStreetInvalid = showValidationErrors && street.trim().length < 5;
   const isZipInvalid = showValidationErrors && !/^\d{5}(-\d{4})?$/.test(zip.trim());
@@ -57,50 +64,37 @@ export function NewAddressForm({
       setSaveError("Please enter a valid 5-digit zip code.");
       return;
     }
-
     setSaveError("");
     setIsSaving(true);
 
     try {
       const userId = currentUser?.id || currentUser?.email || "guest-customer";
+      const payload = {
+        id: editingAddress?.id,
+        user_id: userId,
+        label: addressLabel,
+        street_address: street.trim(),
+        apt_unit: apt.trim(),
+        city: city.trim(),
+        state,
+        zip_code: zip.trim(),
+        is_default: editingAddress?.is_default ?? (!hasSavedAddresses),
+      };
       const res = await fetch("/api/user/addresses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingAddress?.id,
-          user_id: userId,
-          label: addressLabel,
-          street_address: street.trim(),
-          apt_unit: apt.trim(),
-          city: city.trim(),
-          state,
-          zip_code: zip.trim(),
-          is_default: editingAddress?.is_default ?? (!hasSavedAddresses),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
-      if (res.ok && data.success && data.address) {
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
-        onAddressSaved?.(data.address);
-      } else {
-        const fallbackAddr: UserAddress = {
-          id: editingAddress?.id || `addr-${Date.now()}`,
-          user_id: userId,
-          label: addressLabel,
-          street_address: street.trim(),
-          apt_unit: apt.trim(),
-          city: city.trim(),
-          state,
-          zip_code: zip.trim(),
-          is_default: editingAddress?.is_default ?? (!hasSavedAddresses),
-          created_at: editingAddress?.created_at || new Date().toISOString(),
-        };
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
-        onAddressSaved?.(fallbackAddr);
-      }
+      const addrToReturn: UserAddress = (res.ok && data.success && data.address) ? data.address : {
+        ...payload,
+        id: editingAddress?.id || `addr-${Date.now()}`,
+        created_at: editingAddress?.created_at || new Date().toISOString(),
+      };
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      onAddressSaved?.(addrToReturn);
     } catch {
       setSaveError("Could not save to account. Address will be used for this order.");
     } finally {
@@ -180,41 +174,60 @@ export function NewAddressForm({
         </div>
       </div>
 
+      {zip.trim().length >= 5 && (
+        <div
+          className={cn(
+            "p-3 rounded-xl border text-xs flex items-center justify-between gap-2 transition-all",
+            isCovered
+              ? "bg-emerald-50/70 border-emerald-200 text-emerald-900"
+              : "bg-rose-50/70 border-rose-200 text-rose-900"
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "h-2.5 w-2.5 rounded-full shrink-0",
+              isCovered ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-rose-500 ring-2 ring-rose-200"
+            )} />
+            <div>
+              <p className="font-bold text-[11px]">
+                {isCovered ? "Within Delivery Service Area" : "Outside Service Area"}
+              </p>
+              <p className="text-[10px] opacity-80">
+                {isCovered
+                  ? "Your address is covered by our scheduled doorstep pickup & delivery team."
+                  : `We do not service this location yet. Active coverage: ${deliveryZones.map((z) => z.zip ? `${z.city} (${z.zip})` : z.city).join(", ")}`}
+              </p>
+            </div>
+          </div>
+          <span className={cn(
+            "text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shrink-0",
+            isCovered ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+          )}>
+            {isCovered ? "Serviceable" : "Not Covered"}
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold text-slate-700 uppercase">Save As:</span>
           <div className="flex gap-1">
             {["Home", "Work", "Other"].map((lbl) => (
-              <button
-                key={lbl} type="button" onClick={() => setAddressLabel(lbl)}
+              <button key={lbl} type="button" onClick={() => setAddressLabel(lbl)}
                 className={cn("px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors",
-                  addressLabel === lbl ? "bg-primary text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100")}
-              >
+                  addressLabel === lbl ? "bg-primary text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100")}>
                 {lbl}
               </button>
             ))}
           </div>
         </div>
 
-        <Button
-          type="button" size="sm" disabled={isSaving || street.trim().length < 5}
-          onClick={handleSaveAddress} className="cursor-pointer font-bold shadow-xs flex items-center gap-1.5"
-        >
-          {isSaving ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...</>
-          ) : saveSuccess ? (
-            <><Check className="h-3.5 w-3.5 text-emerald-300" /> Saved!</>
-          ) : (
-            <><BookmarkPlus className="h-3.5 w-3.5" /> {editingAddress ? "Update Address" : "Save Address"}</>
-          )}
+        <Button type="button" size="sm" disabled={isSaving || street.trim().length < 5} onClick={handleSaveAddress} className="cursor-pointer font-bold shadow-xs flex items-center gap-1.5">
+          {isSaving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...</> : saveSuccess ? <><Check className="h-3.5 w-3.5 text-emerald-300" /> Saved!</> : <><BookmarkPlus className="h-3.5 w-3.5" /> {editingAddress ? "Update Address" : "Save Address"}</>}
         </Button>
       </div>
 
-      {saveSuccess && (
-        <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-          <Check className="h-3.5 w-3.5" /> {editingAddress ? "Address updated successfully!" : "Address saved successfully to your account!"}
-        </p>
-      )}
+      {saveSuccess && <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {editingAddress ? "Address updated successfully!" : "Address saved successfully!"}</p>}
       {saveError && <p className="text-xs text-rose-500 font-semibold">{saveError}</p>}
     </div>
   );

@@ -78,6 +78,23 @@ export interface Promotion {
   is_active: boolean;
 }
 
+export interface AdditionalItem {
+  id: string;
+  name: string;
+  category?: string;
+  price: number;
+  description?: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface OrderAdditionalItemSelection {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 export interface Detergent {
   id: string;
   name: string;
@@ -109,6 +126,12 @@ export interface Order {
   delivery_slot?: string | null;
   subtotal: number;
   detergent_fee?: number;
+  additional_items?: OrderAdditionalItemSelection[];
+  additional_items_fee?: number;
+  tip_amount?: number;
+  distance_miles?: number;
+  distance_surcharge?: number;
+  card_setup_link?: string | null;
   discount_amount: number;
   coupon_code?: string | null;
   promotion_id?: string | null;
@@ -158,6 +181,7 @@ export interface OrderProof {
   order_id: string;
   proof_type: "pickup" | "dropoff" | "damage";
   image_url: string;
+  photo_url?: string;
   notes?: string;
   uploaded_by: string;
   created_at: string;

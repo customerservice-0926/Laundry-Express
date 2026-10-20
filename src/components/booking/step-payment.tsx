@@ -4,7 +4,7 @@ import { Lock, Tag, ShieldCheck, ArrowLeft, ArrowRight, Loader2, CheckCircle2 } 
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { CalculatedPriceResult } from "@/lib/stripe/pricing-calc";
-
+import { StepTipSelector } from "./step-tip-selector";
 import type { PricingMode } from "@/types";
 
 interface StepPaymentProps {
@@ -16,6 +16,8 @@ interface StepPaymentProps {
   promoError?: string;
   paymentMethod?: string;
   onSelectPaymentMethod?: (m: "card" | "apple_pay") => void;
+  tipAmount?: number;
+  onTipChange?: (tip: number) => void;
   isProcessing: boolean;
   onConfirm: () => void;
   onBack: () => void;
@@ -28,12 +30,14 @@ export function StepPayment({
   onPromoCodeChange,
   onApplyPromo,
   promoError,
+  tipAmount = 0,
+  onTipChange,
   isProcessing,
   onConfirm,
   onBack,
 }: StepPaymentProps) {
-  const { subtotal, delivery_fee, discount_amount, total_amount } = priceResult;
-  const isFreeDelivery = delivery_fee === 0 && subtotal > 0;
+  const { subtotal, detergent_fee, additional_items_fee, delivery_fee, distance_miles, discount_amount, total_amount } = priceResult;
+  const isFreeDelivery = delivery_fee === 0;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -48,12 +52,28 @@ export function StepPayment({
           </span>
         </div>
 
+        {onTipChange && (
+          <StepTipSelector tipAmount={tipAmount} onTipChange={onTipChange} />
+        )}
+
         {/* Price Breakdown */}
         <div className="space-y-2 text-xs">
           <div className="flex justify-between text-slate-600">
             <span>Laundry Wash</span>
             <span className="font-semibold text-slate-900">{formatCurrency(subtotal)}</span>
           </div>
+          {detergent_fee > 0 && (
+            <div className="flex justify-between text-slate-600">
+              <span>Premium Detergent</span>
+              <span className="font-semibold text-slate-900">+{formatCurrency(detergent_fee)}</span>
+            </div>
+          )}
+          {additional_items_fee > 0 && (
+            <div className="flex justify-between text-slate-600">
+              <span>Additional Items</span>
+              <span className="font-semibold text-slate-900">+{formatCurrency(additional_items_fee)}</span>
+            </div>
+          )}
           <div className="flex justify-between items-center text-slate-600">
             <span>
               Doorstep Delivery{" "}
@@ -61,14 +81,16 @@ export function StepPayment({
                 <span className="text-[10px] font-bold text-emerald-700 ml-1">FREE</span>
               )}
             </span>
-            <span
-              className={
-                isFreeDelivery ? "font-bold text-emerald-600" : "font-semibold text-slate-900"
-              }
-            >
+            <span className={isFreeDelivery ? "font-bold text-emerald-600" : "font-semibold text-slate-900"}>
               {isFreeDelivery ? "$0.00" : formatCurrency(delivery_fee)}
             </span>
           </div>
+          {tipAmount > 0 && (
+            <div className="flex justify-between text-slate-600">
+              <span>Driver / Service Gratuity</span>
+              <span className="font-semibold text-emerald-600">+{formatCurrency(tipAmount)}</span>
+            </div>
+          )}
           {discount_amount > 0 && (
             <div className="flex justify-between text-emerald-600 font-medium">
               <span>Coupon Discount</span>

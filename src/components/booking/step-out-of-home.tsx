@@ -133,7 +133,7 @@ export function StepOutOfHome({
         <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
           <MapPin className="h-3.5 w-3.5 text-primary" /> Pickup &amp; Delivery Address *
         </label>
-        <SavedAddressSelector savedAddresses={savedAddresses} selectedSavedId={selectedSavedId} onSelectSavedAddress={selectSavedAddress} isAddingNew={isAddingNew} onStartAddNew={handleStartAddNew} onEditAddress={handleEditAddress} />
+        <SavedAddressSelector savedAddresses={savedAddresses} selectedSavedId={selectedSavedId} onSelectSavedAddress={selectSavedAddress} isAddingNew={isAddingNew} onStartAddNew={handleStartAddNew} onEditAddress={handleEditAddress} deliveryZones={deliveryZones} />
         {isAddressInvalid && <p role="alert" className="text-xs font-medium text-rose-600">Enter a street address, city, 2-letter state code, and valid 5-digit ZIP code.</p>}
         {(isAddingNew || savedAddresses.length === 0) && (
           <NewAddressForm

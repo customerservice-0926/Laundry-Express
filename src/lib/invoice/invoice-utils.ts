@@ -94,6 +94,17 @@ export function orderToUnifiedInvoice(
     order.stripe_payment_intent ||
     `STRIPE-TX-${orderId.replace(/[^A-Za-z0-9]/g, "").slice(-8).toUpperCase()}`;
 
+  let parsedAdditionalItems: { name: string; price: number; quantity: number }[] = [];
+  if (Array.isArray(order.additional_items)) {
+    parsedAdditionalItems = order.additional_items;
+  } else if (typeof order.additional_items === "string") {
+    try {
+      parsedAdditionalItems = JSON.parse(order.additional_items);
+    } catch {}
+  }
+  const computedItemsFee = parsedAdditionalItems.reduce((s, i) => s + (Number(i.price || 0) * Number(i.quantity || 1)), 0);
+  const additionalItemsFee = Number(order.additional_items_fee ?? computedItemsFee);
+
   return {
     orderId,
     orderNumber: orderId,
@@ -106,6 +117,9 @@ export function orderToUnifiedInvoice(
     subtotal: Number(order.subtotal || order.total_amount || 0),
     detergentFee: Number(order.detergent_fee || 0),
     deliveryFee: Number(order.delivery_fee || 0),
+    additionalItemsFee,
+    additionalItems: parsedAdditionalItems,
+    tipAmount: Number(order.tip_amount || 0),
     discountAmount: Number(order.discount_amount || 0),
     transactionId,
     customerName: options?.customerName || order.customer_name || "Valued Customer",

@@ -75,6 +75,9 @@ export interface InvoiceEmailPayload {
   detergentFee?: number;
   subtotal: number;
   deliveryFee: number;
+  additionalItemsFee?: number;
+  additionalItems?: { name: string; price: number; quantity: number }[];
+  tipAmount?: number;
   discountAmount: number;
   totalAmount: number;
   address: string;
@@ -86,13 +89,15 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
   if (!payload.customerEmail) throw new Error("Customer email is required for invoice delivery.");
   const { from, admin } = getMailAddresses();
 
-  const html = generateInvoiceHtml({
+  const unifiedInvoice = {
     ...payload,
     orderId: payload.orderNumber,
-  });
+  };
+
+  const html = generateInvoiceHtml(unifiedInvoice);
 
   const transport = createTransport();
-  const invoicePdf = createEmailInvoicePdf(payload);
+  const invoicePdf = createEmailInvoicePdf(unifiedInvoice);
   const attachment = {
     filename: `LaundryExpress-Invoice-${payload.orderNumber.replace(/[^A-Za-z0-9-]/g, "")}.pdf`,
     content: invoicePdf,

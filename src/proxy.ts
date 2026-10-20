@@ -59,6 +59,8 @@ export async function proxy(req: NextRequest) {
         "customers",
         "packages",
         "detergents",
+        "additional-items",
+        "additional_items",
         "coupons",
         "reviews",
         "faqs",

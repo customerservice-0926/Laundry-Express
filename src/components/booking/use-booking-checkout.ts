@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { AddressDetails } from "./step-out-of-home";
-import type { PricingMode, User } from "@/types";
+import type { PricingMode, User, OrderAdditionalItemSelection } from "@/types";
 import type { CouponItem } from "@/lib/services/coupon-service";
 
 export interface CheckoutPayload {
@@ -12,6 +12,10 @@ export interface CheckoutPayload {
   bagCount: number;
   weightLbs?: number;
   selectedDetergentId: string;
+  additionalItems?: OrderAdditionalItemSelection[];
+  tipAmount?: number;
+  distanceMiles?: number;
+  distanceSurcharge?: number;
   selectedDate: string;
   selectedSlot: string;
   dropoffDate: string;
@@ -22,7 +26,14 @@ export interface CheckoutPayload {
   isAwayForDropoff: boolean;
   bagConfirmed: boolean;
   notes: string;
-  priceResult: { subtotal: number; detergent_fee: number; delivery_fee: number; discount_amount: number; total_amount: number };
+  priceResult: {
+    subtotal: number;
+    detergent_fee: number;
+    additional_items_fee?: number;
+    delivery_fee: number;
+    discount_amount: number;
+    total_amount: number;
+  };
   coupon?: CouponItem;
   paymentMethod: "card" | "apple_pay";
 }
@@ -50,6 +61,11 @@ export function useBookingCheckout() {
           bag_count: p.bagCount,
           estimated_weight_lbs: weightAmount,
           detergent_id: p.selectedDetergentId,
+          additional_items: p.additionalItems || [],
+          additional_items_fee: p.priceResult.additional_items_fee || 0,
+          tip_amount: p.tipAmount || 0,
+          distance_miles: p.distanceMiles || 0,
+          distance_surcharge: p.distanceSurcharge || 0,
           promo_code: p.coupon?.code,
           pickup_date: p.selectedDate,
           pickup_slot: p.selectedSlot,
@@ -77,7 +93,6 @@ export function useBookingCheckout() {
         return;
       }
 
-      // If Stripe returned a checkout session URL, redirect immediately
       if (data?.checkoutUrl) {
         window.location.href = data.checkoutUrl;
         return;

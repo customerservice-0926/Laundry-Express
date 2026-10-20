@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Check, ShoppingBag, Scale, Zap } from "lucide-react";
+import { Check, ShoppingBag, Scale, Zap, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FloatingBubbles } from "./floating-bubbles";
 import { useSettings, useSlot1Label, useSlot2Label } from "@/hooks/use-settings";
@@ -72,15 +72,12 @@ export function PricingSection() {
               </div>
 
               {/* Delivery Fee highlight */}
-              <div className="p-4 rounded-2xl bg-sky-50/80 border border-sky-100 mb-6 space-y-2 text-xs">
-                <div className="flex justify-between items-center text-slate-700 font-semibold">
-                  <span>Below {pricing?.free_delivery_threshold ?? "—"} Bags:</span>
-                  <span className="text-slate-900 font-bold">{pricing ? `$${pricing.standard_delivery_fee.toFixed(2)} pickup &amp; delivery` : "Delivery fee configured by admin"}</span>
+              <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 mb-6 space-y-1.5 text-xs">
+                <div className="flex justify-between items-center text-emerald-900 font-bold">
+                  <span>Pickup &amp; Delivery:</span>
+                  <span className="uppercase text-emerald-700 font-black bg-white px-2 py-0.5 rounded-md border border-emerald-200">{pricing && pricing.free_delivery_threshold ? `Free (${pricing.free_delivery_threshold}+ Bags)` : "Doorstep Delivery"}</span>
                 </div>
-                <div className="flex justify-between items-center text-emerald-800 font-bold bg-emerald-100/80 p-2 rounded-xl">
-                  <span>{pricing?.free_delivery_threshold ?? "—"} or More Bags:</span>
-                  <span className="uppercase text-emerald-700">FREE Pickup &amp; Delivery</span>
-                </div>
+                <p className="text-[11px] text-emerald-800">Free delivery on qualifying bag orders in our service area.</p>
               </div>
 
               <ul className="space-y-3 text-xs text-slate-700">
@@ -131,15 +128,12 @@ export function PricingSection() {
               </div>
 
               {/* Delivery Fee highlight */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 mb-6 space-y-2 text-xs">
-                <div className="flex justify-between items-center text-slate-700 font-semibold">
-                  <span>Orders under {pricing?.free_delivery_lbs ?? "—"} lbs:</span>
-                  <span className="text-slate-900 font-bold">{pricing ? `$${pricing.standard_delivery_fee.toFixed(2)} delivery fee` : "Delivery fee configured by admin"}</span>
+              <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 mb-6 space-y-1.5 text-xs">
+                <div className="flex justify-between items-center text-emerald-900 font-bold">
+                  <span>Pickup &amp; Delivery:</span>
+                  <span className="uppercase text-emerald-700 font-black bg-white px-2 py-0.5 rounded-md border border-emerald-200">{pricing && pricing.free_delivery_lbs ? `Free (${pricing.free_delivery_lbs}+ lbs)` : "Doorstep Delivery"}</span>
                 </div>
-                <div className="flex justify-between items-center text-emerald-800 font-bold bg-emerald-100/80 p-2 rounded-xl">
-                  <span>Orders {pricing?.free_delivery_lbs ?? "—"} lbs and over:</span>
-                  <span className="uppercase text-emerald-700">FREE ($0.00) Delivery</span>
-                </div>
+                <p className="text-[11px] text-emerald-800">Free delivery on qualifying weight orders in our service area.</p>
               </div>
 
               <ul className="space-y-3 text-xs text-slate-700">
@@ -170,6 +164,22 @@ export function PricingSection() {
               </Link>
             </div>
           </div>
+        </div>
+
+        {/* Specialty Items Banner */}
+        <div className="mt-8 p-4 rounded-2xl bg-white border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-pink-50 text-primary shrink-0">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <div>
+              <strong className="text-slate-900 block font-bold">Have specialty items? (Uniforms, shoe cleaning, comforters)</strong>
+              <span className="text-slate-500">We offer specialty care starting at $15 with 100% free delivery.</span>
+            </div>
+          </div>
+          <Link href="/pricing" className="shrink-0 font-bold text-primary hover:underline">
+            View All Specialty Items &rarr;
+          </Link>
         </div>
       </div>
     </section>

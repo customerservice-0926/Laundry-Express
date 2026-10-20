@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/context/auth-context";
+import { Toaster } from "@/components/ui/toast";
 import { APP_CONFIG } from "@/lib/constants";
 import "./globals.css";
 
@@ -168,6 +169,7 @@ export default function RootLayout({
         {/* Main Application Shell with Global Auth Provider */}
         <div className="flex-1 flex flex-col w-full overflow-x-clip">
           <AuthProvider>{children}</AuthProvider>
+          <Toaster />
         </div>
       </body>
     </html>

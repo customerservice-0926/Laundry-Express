@@ -56,7 +56,7 @@ export function HeroSection({ initialBagPrice }: HeroSectionProps) {
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
               </span>
               <p className="font-bold text-slate-900">
-                {deliveryZones.length ? deliveryZones.join(", ") : "Service areas configured by Laundry Express"}
+                {deliveryZones.length ? deliveryZones.join(", ") : "Local Service Coverage"} &bull; <span className="text-emerald-700 uppercase font-black">Doorstep Pickup &amp; Delivery</span>
               </p>
             </div>
 
