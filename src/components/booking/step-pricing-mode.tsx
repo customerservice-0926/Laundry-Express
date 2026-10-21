@@ -20,8 +20,6 @@ export function StepPricingMode({
   bagPrice,
   poundPrice,
   minLbs,
-  freeDeliveryBags,
-  freeDeliveryLbs,
   packageFromPrice,
 }: StepPricingModeProps) {
   const modes: Array<{

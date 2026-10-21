@@ -22,7 +22,7 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
   const [bagCount, setBagCount] = React.useState(2), [bagRate, setBagRate] = React.useState(25);
   const [weightLbs, setWeightLbs] = React.useState(15), [poundRate, setPoundRate] = React.useState(1.75);
   const [selectedAddItems, setSelectedAddItems] = React.useState<OrderAdditionalItemSelection[]>([]);
-  const [tipAmount, setTipAmount] = React.useState(0), [notes, setNotes] = React.useState("");
+  const [notes, setNotes] = React.useState("");
   const [customerName, setCustomerName] = React.useState(""), [customerPhone, setCustomerPhone] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false), [error, setError] = React.useState("");
   const { items: availableItems } = useAdditionalItems(true);
@@ -36,7 +36,6 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
     setWeightLbs(wt);
     setPoundRate(wt ? Math.round((order.subtotal / wt) * 100) / 100 || 1.75 : 1.75);
     setSelectedAddItems(Array.isArray(order.additional_items) ? [...order.additional_items] : []);
-    setTipAmount(order.tip_amount || 0);
     setNotes(order.customer_notes || "");
     setCustomerName(order.customer_name || "");
     setCustomerPhone(order.customer_phone || "");
@@ -49,15 +48,22 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
   const isAlreadyPaid = order.payment_status === "paid";
   const isLocked = isCompleted || isAlreadyPaid;
 
+  const tipAmount = Number(order.tip_amount || 0);
   const currentSubtotal = mode === "per_bag" ? Math.round(bagCount * bagRate * 100) / 100 : Math.round(weightLbs * poundRate * 100) / 100;
   const additionalItemsFee = selectedAddItems.reduce((acc, it) => acc + (it.price * it.quantity), 0) > 0
     ? Math.round(selectedAddItems.reduce((acc, it) => acc + (it.price * it.quantity), 0) * 100) / 100
     : Number(order.additional_items_fee || 0);
 
   const detergentFee = Number(order.detergent_fee || 0), deliveryFee = Number(order.delivery_fee || 0), discountAmount = Number(order.discount_amount || 0);
+  const isUpfrontPaid = Boolean(
+    order.delivery_fee_paid ||
+    order.tip_paid ||
+    order.payment_status === "paid" ||
+    (order.payment_status === "authorized" && order.stripe_payment_intent)
+  );
   const calculatedTotal = isLocked ? Number(order.total_amount || 0) : Math.max(0, Math.round((currentSubtotal + detergentFee + additionalItemsFee + deliveryFee + tipAmount - discountAmount) * 100) / 100);
-  const unpaidDelivery = order.delivery_fee_paid ? 0 : deliveryFee;
-  const unpaidTip = order.tip_paid ? 0 : tipAmount;
+  const unpaidDelivery = isUpfrontPaid ? 0 : deliveryFee;
+  const unpaidTip = isUpfrontPaid ? 0 : tipAmount;
   const washBalance = Math.max(0, currentSubtotal + detergentFee + additionalItemsFee - discountAmount);
   const remainingBalance = Math.round((washBalance + unpaidDelivery + unpaidTip) * 100) / 100;
   const hasCardOnFile = Boolean(order.stripe_payment_method_id || (order.stripe_customer_id && (order.card_last4 || order.stripe_payment_method_id)));
@@ -89,7 +95,7 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
             bag_count: mode === "per_bag" ? bagCount : 0,
             weight_lbs: mode === "per_lb" ? weightLbs : 0,
             bag_rate: bagRate, pound_rate: poundRate,
-            additional_items: selectedAddItems, additional_items_fee: additionalItemsFee, tip_amount: tipAmount,
+            additional_items: selectedAddItems, additional_items_fee: additionalItemsFee,
             customer_name: customerName.trim() || undefined, customer_phone: customerPhone.trim() || undefined, customer_notes: notes.trim(),
           };
 
@@ -111,17 +117,12 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
       <form onSubmit={handleSave} className="space-y-4 text-xs text-slate-700">
         {error && <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-semibold">{error}</div>}
 
-        {isAlreadyPaid ? (
+        {(isAlreadyPaid || isCompleted) && (
           <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center gap-2">
             <Lock className="h-4 w-4 text-amber-700 shrink-0" />
-            <span>Payment Settled — Charges already cut from customer card. Billing metrics cannot be altered again.</span>
+            <span>{isAlreadyPaid ? "Payment Settled — Charges already cut from customer card. Billing metrics cannot be altered again." : "Completed Order — Billing metrics are locked. Contact info and notes are editable."}</span>
           </div>
-        ) : isCompleted ? (
-          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center gap-2">
-            <Lock className="h-4 w-4 text-amber-700 shrink-0" />
-            <span>Completed Order — Billing metrics are locked. Contact info and notes are editable.</span>
-          </div>
-        ) : null}
+        )}
 
         {/* Pricing Mode Conversion Switch */}
         <div className="space-y-1.5">
@@ -147,38 +148,28 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
         </div>
 
         {/* Dynamic Quantity & Rates */}
-        {mode === "per_bag" ? (
-          <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">Number of Bags</label>
-              <input type="number" min="1" max="20" disabled={isLocked} value={bagCount} onChange={(e) => setBagCount(parseInt(e.target.value, 10) || 1)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">Rate per Bag ($)</label>
-              <input type="number" step="0.50" min="5" disabled={isLocked} value={bagRate} onChange={(e) => setBagRate(parseFloat(e.target.value) || 25)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
-            </div>
+        <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">{mode === "per_bag" ? "Number of Bags" : "Scale Weight (lbs)"}</label>
+            <input type="number" step={mode === "per_bag" ? "1" : "0.1"} min="1" disabled={isLocked} value={mode === "per_bag" ? bagCount : weightLbs} onChange={(e) => mode === "per_bag" ? setBagCount(parseInt(e.target.value, 10) || 1) : setWeightLbs(parseFloat(e.target.value) || 15)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
           </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">Scale Weight (lbs)</label>
-              <input type="number" step="0.1" min="1" disabled={isLocked} value={weightLbs} onChange={(e) => setWeightLbs(parseFloat(e.target.value) || 15)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">Rate per Lb ($)</label>
-              <input type="number" step="0.05" min="0.5" disabled={isLocked} value={poundRate} onChange={(e) => setPoundRate(parseFloat(e.target.value) || 1.75)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
-            </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">{mode === "per_bag" ? "Rate per Bag ($)" : "Rate per Lb ($)"}</label>
+            <input type="number" step={mode === "per_bag" ? "1" : "0.05"} min={mode === "per_bag" ? "5" : "0.5"} disabled={isLocked} value={mode === "per_bag" ? bagRate : poundRate} onChange={(e) => mode === "per_bag" ? setBagRate(parseFloat(e.target.value) || 25) : setPoundRate(parseFloat(e.target.value) || 1.75)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
           </div>
-        )}
+        </div>
 
         {/* Additional & Specialty Items Selection */}
         <ManualOrderAddItems items={availableItems} selected={selectedAddItems} onUpdate={handleUpdateAddItem} disabled={isLocked} onAddCustom={handleAddCustomItem} />
 
-        {/* Driver Tip & Specialty Items Summary */}
+        {/* Read-Only Driver Tip Mention & Specialty Items Summary */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-bold text-slate-700 mb-1">Driver Tip ($)</label>
-            <input type="number" step="1" min="0" disabled={isLocked} value={tipAmount} onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-emerald-700 bg-white disabled:bg-slate-100" />
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">Driver Tip (Gratuity)</label>
+            <div className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50/70 text-xs font-bold text-emerald-900 flex items-center justify-between">
+              <span className="text-[10px] text-emerald-800">{isUpfrontPaid ? "✓ Paid at Booking" : "Customer Tip"}</span>
+              <span className="text-emerald-700 font-black">+{formatCurrency(tipAmount)}</span>
+            </div>
           </div>
           <div>
             <label className="block text-[11px] font-bold text-slate-700 mb-1">Specialty Items Fee</label>
@@ -208,10 +199,19 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
         {/* Live Total Recalculation Bar */}
         <div className="p-3 rounded-xl bg-pink-50/50 border border-primary/20 flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-black uppercase text-slate-500 block">{isLocked ? "Settled Total" : "Recalculated Total"}</span>
-            <span className="text-xs text-slate-600">{isLocked ? "Charges settled — Contact details editable" : `Subtotal: ${formatCurrency(currentSubtotal)} · Items: +${formatCurrency(additionalItemsFee)}`}</span>
+            <span className="text-[10px] font-black uppercase text-slate-500 block">
+              {isLocked ? "Settled Total" : isUpfrontPaid ? "Wash & Items Balance to Charge" : "Recalculated Total"}
+            </span>
+            <span className="text-xs text-slate-600">
+              {isLocked ? "Charges settled — Contact details editable" : `Subtotal: ${formatCurrency(currentSubtotal)} · Items: +${formatCurrency(additionalItemsFee)}`}
+            </span>
           </div>
-          <span className="text-xl font-black text-slate-900 tracking-tight">{formatCurrency(calculatedTotal)}</span>
+          <div className="text-right">
+            <span className="text-xl font-black text-slate-900 tracking-tight">
+              {formatCurrency(isUpfrontPaid ? remainingBalance : calculatedTotal)}
+            </span>
+            {isUpfrontPaid && <span className="text-[10px] text-emerald-700 font-bold block">(Excludes $20.00 delivery &amp; tip paid upfront)</span>}
+          </div>
         </div>
 
         {/* Card on file status and Stripe cut preview */}
@@ -221,7 +221,7 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
               <CreditCard className="h-4 w-4 text-emerald-600 shrink-0" />
               <div>
                 <span className="font-extrabold block">Card on File: {(order.card_brand || "Card").toUpperCase()} •••• {order.card_last4 || "Stored"}</span>
-                <span className="text-[11px] text-emerald-700">Order balance of {formatCurrency(amountToCharge)} will be charged via Stripe{(order.delivery_fee_paid || order.tip_paid) ? " (Delivery & Tip settled upfront)" : ""}</span>
+                <span className="text-[11px] text-emerald-700">Net wash balance of {formatCurrency(amountToCharge)} will be charged via Stripe{isUpfrontPaid ? " (Delivery & Tip settled upfront)" : ""}</span>
               </div>
             </div>
             <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 font-black text-xs">+{formatCurrency(amountToCharge)}</span>

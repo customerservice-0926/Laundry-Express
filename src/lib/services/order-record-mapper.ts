@@ -39,13 +39,13 @@ export function mapOrderRecord(item: OrderRecord): Order {
     (item.payment_status === "authorized" && Boolean(item.stripe_payment_intent_id))
   );
 
-  const tipPaid = item.tip_paid !== undefined
+  const tipPaid = (item.tip_paid != null)
     ? Boolean(item.tip_paid)
-    : (addressObj.tip_paid !== undefined ? Boolean(addressObj.tip_paid) : isInitialPaid);
+    : (addressObj.tip_paid != null ? Boolean(addressObj.tip_paid) : isInitialPaid);
 
-  const deliveryPaid = item.delivery_fee_paid !== undefined
+  const deliveryPaid = (item.delivery_fee_paid != null)
     ? Boolean(item.delivery_fee_paid)
-    : (addressObj.delivery_fee_paid !== undefined ? Boolean(addressObj.delivery_fee_paid) : isInitialPaid);
+    : (addressObj.delivery_fee_paid != null ? Boolean(addressObj.delivery_fee_paid) : isInitialPaid);
 
   return {
     ...item,

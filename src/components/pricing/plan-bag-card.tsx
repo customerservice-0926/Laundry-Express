@@ -37,7 +37,6 @@ export function PlanBagCard({ bagCount, onBagCountChange, initialRates }: PlanBa
 
   const bagSubtotal = bagCount * rates.baseBagPrice;
   const isFreeDelivery = true;
-  const bagDeliveryFee = 0.0;
   const bagTotal = bagSubtotal;
 
   return (

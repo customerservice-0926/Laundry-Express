@@ -80,7 +80,6 @@ export async function POST(
     }
 
     const origin = req.nextUrl.origin;
-    const isPerLb = order.pricing_mode === "per_lb";
 
     let customerId = order.stripe_customer_id;
     if (!customerId && order.customer_email) {

@@ -18,6 +18,7 @@ export function getLocalBusinessSchema(pricing?: PricingConfig | null, settings?
     priceRange: "$$",
     paymentAccepted: "Credit Card, Apple Pay, Google Pay",
     currenciesAccepted: "USD",
+    openingHours: settings?.operating_hours || "Mo-Su 08:00-18:00",
     areaServed: { "@type": "AdministrativeArea", name: "40-Mile Northern Illinois Service Radius (Lake in the Hills & Chicago Northwest Suburbs)" },
     makesOffer: pricing ? [
       {

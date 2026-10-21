@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Camera, Trash2, RefreshCw, Plus, AlertTriangle, Loader2, Edit2, Check } from "lucide-react";
+import { Camera, Trash2, RefreshCw, Plus, Loader2, Edit2, Check } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { ConfirmModal } from "@/components/ui/confirm-modal";

@@ -74,8 +74,6 @@ export function StepBagCounter({
   }
 
   if (pricingMode === "per_lb") {
-    const isFreePoundDelivery = currentLbs >= freeDeliveryLbs;
-
     return (
       <div className="space-y-4 p-5 rounded-2xl bg-white border border-slate-200">
         <div className="flex items-center justify-between">

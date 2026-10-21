@@ -190,12 +190,9 @@ export function CustomersManager({ customers }: CustomersManagerProps) {
                         {formatCurrency(custTotalSpent)}
                       </td>
 
-                      <td className="p-3.5 text-right whitespace-nowrap min-w-[140px] space-x-1">
-                        <Button size="sm" className="h-7 px-2 text-[11px] bg-primary/10 text-primary hover:bg-primary hover:text-white font-bold" onClick={() => handleStartOrder(cust)}>
-                          <Phone className="h-3 w-3 mr-1" /> Order
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] text-slate-700 hover:text-primary" onClick={() => setSelectedCustomer(cust)}>
-                          <Eye className="h-3 w-3 mr-1" /> Profile
+                      <td className="p-3.5 text-right whitespace-nowrap">
+                        <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px] text-slate-700 hover:text-primary font-bold" onClick={() => setSelectedCustomer(cust)}>
+                          <Eye className="h-3.5 w-3.5 mr-1" /> Profile
                         </Button>
                       </td>
                     </tr>

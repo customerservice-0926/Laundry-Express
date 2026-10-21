@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ShieldCheck, Lock, CheckCircle2, ArrowRight, Loader2, Sparkles, MapPin, Calendar, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StepTipSelector } from "@/components/booking/step-tip-selector";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { Order } from "@/types";
 
 interface OrderPayViewProps {
@@ -30,7 +30,6 @@ export function OrderPayView({ order, sessionId }: OrderPayViewProps) {
         100
     ) / 100
   );
-  const totalWithTip = Math.max(0, Math.round((baseAmount + tipAmount) * 100) / 100);
 
   const handlePay = async () => {
     setIsSubmitting(true);

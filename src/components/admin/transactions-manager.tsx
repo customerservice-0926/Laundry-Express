@@ -118,7 +118,7 @@ export function TransactionsManager({ orders }: TransactionsManagerProps) {
             </label>
             <div className="relative">
               <select
-                id="tx-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value as any)}
+                id="tx-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value as "all" | "today" | "week" | "month" | "year")}
                 className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-900 text-xs font-bold py-2 pl-3 pr-8 rounded-xl shadow-2xs transition-colors cursor-pointer focus:outline-none"
               >
                 <option value="all">All Time</option>

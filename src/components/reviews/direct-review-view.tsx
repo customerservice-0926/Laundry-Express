@@ -207,7 +207,6 @@ export function DirectReviewView({ orderNumber, customerName, completedDate, tok
           <div className="grid grid-cols-3 gap-3">
             {photos.map((url, i) => (
               <div key={i} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 group bg-slate-50">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
                 <button
                   type="button"

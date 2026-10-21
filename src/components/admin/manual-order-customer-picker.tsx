@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, UserCheck, X, Check, Loader2, Sparkles } from "lucide-react";
+import { Search, X, Check, Loader2 } from "lucide-react";
 import type { CustomerAccount } from "./customer-detail-modal";
 import type { ManualOrderFormState } from "./manual-order-types";
 
@@ -10,7 +10,7 @@ interface CustomerPickerProps {
   currentEmail?: string;
 }
 
-export function ManualOrderCustomerPicker({ onSelectCustomer, currentEmail }: CustomerPickerProps) {
+export function ManualOrderCustomerPicker({ onSelectCustomer }: CustomerPickerProps) {
   const [customers, setCustomers] = React.useState<CustomerAccount[]>([]);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(false);

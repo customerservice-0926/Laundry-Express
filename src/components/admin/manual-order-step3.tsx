@@ -23,7 +23,6 @@ export function ManualOrderStep3({
   deliveryFee,
   detergentFee,
   additionalItemsFee = 0,
-  distanceMiles = 0,
   totalAmount,
 }: Step3Props) {
   const isFreeDelivery = deliveryFee === 0;

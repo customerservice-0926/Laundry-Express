@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Minus, Shirt, Sparkles, ChevronDown, ChevronUp, Check } from "lucide-react";
+import { Plus, Minus, Shirt, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { useAdditionalItems } from "@/hooks/use-additional-items";
 import type { OrderAdditionalItemSelection } from "@/types";
 import { formatCurrency } from "@/lib/utils";

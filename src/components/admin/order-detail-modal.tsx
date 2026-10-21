@@ -41,7 +41,7 @@ export function OrderDetailModal({
       description={`Created on ${formatDate(order.created_at)} • Live operations audit`}
       className="max-w-3xl"
     >
-      <div className="space-y-5 text-xs text-slate-700 pb-8">
+      <div className="space-y-5 text-xs text-slate-700 pb-12">
         {/* Top Status & Overview Banner */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
           <div className="flex items-center gap-2">
@@ -60,30 +60,30 @@ export function OrderDetailModal({
         {/* 2-Column Primary Details Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {/* Card 1: Customer Contact & Delivery Presence */}
-          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-2 font-bold text-slate-900">
+          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3 min-w-0">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 gap-2">
+              <div className="flex items-center gap-2 font-bold text-slate-900 shrink-0">
                 <User className="h-4 w-4 text-sky-600 shrink-0" />
                 <span>Customer &amp; Presence</span>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-pink-50 border border-pink-200 text-primary">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-pink-50 border border-pink-200 text-primary shrink-0">
                 {prevOrdersCount > 0 ? "Repeat Customer" : "New Customer"}
               </span>
             </div>
 
-            <div className="space-y-1.5 leading-relaxed">
-              <p className="font-extrabold text-sm text-slate-900">{order.customer_name || order.user?.full_name || "Customer"}</p>
-              <div className="flex items-center gap-2">
+            <div className="space-y-1.5 leading-relaxed min-w-0">
+              <p className="font-extrabold text-sm text-slate-900 truncate">{order.customer_name || order.user?.full_name || "Customer"}</p>
+              <div className="flex items-center gap-2 min-w-0">
                 <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <a href={`mailto:${order.customer_email || order.user?.email}`} className="text-sky-600 hover:underline truncate">{order.customer_email || order.user?.email || "No email"}</a>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                <a href={`tel:${order.customer_phone || order.user?.phone || ""}`} className="text-slate-800 font-semibold hover:text-sky-600">{order.customer_phone || order.user?.phone || "No phone"}</a>
+                <a href={`tel:${order.customer_phone || order.user?.phone || ""}`} className="text-slate-800 font-semibold hover:text-sky-600 truncate">{order.customer_phone || order.user?.phone || "No phone"}</a>
               </div>
-              <div className="flex items-start gap-2 pt-1">
+              <div className="flex items-start gap-2 pt-1 min-w-0">
                 <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
-                <span className="font-medium text-slate-900 break-words">{fullOrderAddress}</span>
+                <span className="font-medium text-slate-900 break-words leading-tight">{fullOrderAddress}</span>
               </div>
             </div>
 

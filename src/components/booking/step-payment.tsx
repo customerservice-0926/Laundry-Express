@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Tag, ShieldCheck, ArrowLeft, ArrowRight, Loader2, CheckCircle2, CreditCard, Sparkles } from "lucide-react";
+import { Lock, Tag, ShieldCheck, ArrowLeft, ArrowRight, Loader2, CheckCircle2, CreditCard } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { CalculatedPriceResult } from "@/lib/stripe/pricing-calc";

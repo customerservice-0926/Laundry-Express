@@ -47,8 +47,6 @@ export function PlanPoundCard({ weightLbs, onWeightLbsChange, initialRates }: Pl
 
   const effectiveWeight = Math.max(rates.minLbs, Math.min(rates.maxLbs, weightLbs));
   const subtotal = Math.round(effectiveWeight * rates.poundPrice * 100) / 100;
-  const isFreeDelivery = true;
-  const deliveryFee = 0.0;
   const total = subtotal;
 
   return (

@@ -177,7 +177,8 @@ export class OrderManagementService {
     const remainingToCharge = Math.round((washAndItems + unpaidDelivery + unpaidTip) * 100) / 100;
     const toCharge = !isPaid ? remainingToCharge : savedOrder.total_amount > currentOrder.total_amount ? Math.round((savedOrder.total_amount - currentOrder.total_amount) * 100) / 100 : 0;
 
-    let cardCharged = false, chargedAmount = 0, chargeMessage = "Order updated successfully.";
+    const cardCharged = false, chargedAmount = 0;
+    let chargeMessage = "Order updated successfully.";
     if (toCharge > 0 && updates.charge_card !== false) {
       if (hasCard) {
         const chargeRes = await CardOnFileService.chargeCardOnFile(savedOrder.id, toCharge, savedOrder.total_amount);
