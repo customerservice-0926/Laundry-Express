@@ -31,8 +31,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!id || !body || typeof body !== "object") {
       return NextResponse.json({ success: false, error: "Order ID and valid update payload are required." }, { status: 400 });
     }
-    const order = await OrderManagementService.updateOrder(id, body);
-    return NextResponse.json({ success: true, order, message: "Order updated successfully." });
+    const result = await OrderManagementService.updateOrder(id, body);
+    return NextResponse.json({
+      success: true,
+      order: result.order,
+      message: result.chargeMessage,
+      cardCharged: result.cardCharged,
+      chargedAmount: result.chargedAmount,
+    });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update order";
     return NextResponse.json({ success: false, error: msg }, { status: 500 });

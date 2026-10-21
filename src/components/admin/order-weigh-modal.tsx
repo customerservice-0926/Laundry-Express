@@ -54,9 +54,11 @@ export function OrderWeighModal({
   const weightNum = parseFloat(scaleWeight) || 0;
   const subtotal = Math.round(weightNum * poundRate * 100) / 100;
   const detergentFee = Number(order.detergent_fee || 0);
+  const additionalItemsFee = Number(order.additional_items_fee || 0);
+  const tipAmount = Number(order.tip_amount || 0);
   const deliveryFee = weightNum >= freeDeliveryLbs ? 0 : deliveryFeeRate;
   const discount = Number(order.discount_amount || 0);
-  const liveTotal = Math.max(0, subtotal + detergentFee + deliveryFee - discount);
+  const liveTotal = Math.max(0, subtotal + detergentFee + additionalItemsFee + tipAmount + deliveryFee - discount);
 
   const hasCard = Boolean(order.stripe_payment_method_id || order.card_last4);
   const cardLabel = order.card_last4

@@ -2,6 +2,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { broadcastOrderEvent } from "@/lib/services/order-realtime-service";
 import { mapOrderRecord } from "@/lib/services/order-record-mapper";
 import { PricingPlanService } from "@/lib/services/pricing-plan-service";
+import { CardOnFileService } from "@/lib/services/card-on-file-service";
 import { STORAGE_BUCKETS } from "@/lib/services/image-storage-service";
 import type { Order, PricingMode } from "@/types";
 
@@ -9,16 +10,10 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 function extractProofStoragePath(photoUrl?: string | null): string | null {
   if (!photoUrl) return null;
-  if (photoUrl.includes("path=")) {
-    try {
-      const p = new URL(photoUrl, "http://localhost").searchParams.get("path");
-      if (p) return decodeURIComponent(p);
-    } catch {}
-  }
-  if (photoUrl.includes(`/${STORAGE_BUCKETS.ORDER_PROOFS}/`)) {
-    const parts = photoUrl.split(`/${STORAGE_BUCKETS.ORDER_PROOFS}/`);
-    if (parts[1]) return decodeURIComponent(parts[1].split("?")[0]);
-  }
+  try {
+    if (photoUrl.includes("path=")) return decodeURIComponent(new URL(photoUrl, "http://localhost").searchParams.get("path") || "");
+    if (photoUrl.includes(`/${STORAGE_BUCKETS.ORDER_PROOFS}/`)) return decodeURIComponent(photoUrl.split(`/${STORAGE_BUCKETS.ORDER_PROOFS}/`)[1]?.split("?")[0] || "");
+  } catch {}
   return null;
 }
 
@@ -32,6 +27,14 @@ export interface OrderUpdatePayload {
   customer_name?: string; customer_phone?: string; customer_email?: string;
   street_address?: string; apt_unit?: string; city?: string; state?: string; zip_code?: string;
   order_status?: Order["order_status"]; payment_status?: string; customer_notes?: string;
+  charge_card?: boolean;
+}
+
+export interface UpdateOrderResult {
+  order: Order;
+  cardCharged: boolean;
+  chargedAmount: number;
+  chargeMessage: string;
 }
 
 export class OrderManagementService {
@@ -39,7 +42,7 @@ export class OrderManagementService {
    * Updates an existing order, with support for converting between Bags and Pounds,
    * adjusting weights/rates/additional items/tips, and recalculating totals.
    */
-  static async updateOrder(orderId: string, updates: OrderUpdatePayload): Promise<Order> {
+  static async updateOrder(orderId: string, updates: OrderUpdatePayload): Promise<UpdateOrderResult> {
     const supabase = createAdminSupabaseClient();
     const isIdUuid = UUID_PATTERN.test(orderId);
     const lookupQuery = supabase.from("orders").select("*, proofs:order_proofs(*)");
@@ -51,6 +54,11 @@ export class OrderManagementService {
 
     const currentOrder = mapOrderRecord(current);
     const pricing = await PricingPlanService.getPricing();
+    const isPaid = currentOrder.payment_status === "paid";
+    const hasBillingChanges = updates.pricing_mode !== undefined || updates.bag_count !== undefined || updates.weight_lbs !== undefined || updates.additional_items !== undefined || updates.tip_amount !== undefined;
+    if (isPaid && hasBillingChanges) {
+      throw new Error("Order charges have already been cut and paid via Stripe. Billing metrics cannot be altered again.");
+    }
 
     // 1. Determine target mode & volumes
     const mode = updates.pricing_mode ?? currentOrder.pricing_mode;
@@ -105,6 +113,19 @@ export class OrderManagementService {
       zip_code: updates.zip_code ?? currentOrder.zip_code ?? "",
     };
 
+    const currentPickupAddr = (current.pickup_address && typeof current.pickup_address === "object")
+      ? (current.pickup_address as Record<string, unknown>)
+      : {};
+
+    const addressWithMeta = {
+      ...currentPickupAddr,
+      ...address,
+      additional_items: additionalItems,
+      additional_items_fee: additionalItemsFee,
+      tip_amount: tipAmount,
+      distance_surcharge: distanceSurcharge,
+    };
+
     const updateRecord: Record<string, unknown> = {
       plan_type: mode,
       bag_count: bagCount,
@@ -127,20 +148,27 @@ export class OrderManagementService {
       customer_name: updates.customer_name ?? currentOrder.customer_name,
       customer_phone: updates.customer_phone ?? currentOrder.customer_phone,
       customer_email: updates.customer_email ?? currentOrder.customer_email,
-      ...address,
-      pickup_address: address,
-      order_status: updates.order_status ?? currentOrder.order_status,
+      ...address, pickup_address: addressWithMeta,
+      order_status: (updates.order_status === "completed" && (updates.payment_status ?? currentOrder.payment_status) === "pending") ? (() => { throw new Error("Cannot complete order while payment is pending."); })() : ((updates.payment_status ?? currentOrder.payment_status) === "paid" && (updates.order_status ?? currentOrder.order_status) === "pending" ? "confirmed" : (updates.order_status ?? currentOrder.order_status)),
       payment_status: updates.payment_status ?? currentOrder.payment_status,
       special_instructions: updates.customer_notes ?? currentOrder.customer_notes,
       updated_at: new Date().toISOString(),
     };
 
-    const { data: updated, error: updateErr } = await supabase
+    let { data: updated, error: updateErr } = await supabase
       .from("orders")
       .update(updateRecord)
       .eq("id", currentOrder.id)
       .select("*, proofs:order_proofs(*)")
       .single();
+
+    if (updateErr && (updateErr.message.includes("schema cache") || updateErr.message.includes("column"))) {
+      const fallback = { ...updateRecord };
+      ["additional_items", "additional_items_fee", "tip_amount", "distance_surcharge", "distance_miles", "card_setup_link"].forEach((k) => delete fallback[k]);
+      const retryRes = await supabase.from("orders").update(fallback).eq("id", currentOrder.id).select("*, proofs:order_proofs(*)").single();
+      updated = retryRes.data;
+      updateErr = retryRes.error;
+    }
 
     if (updateErr || !updated) {
       throw new Error(`Unable to update order: ${updateErr?.message || "Failed to update record."}`);
@@ -148,18 +176,26 @@ export class OrderManagementService {
 
     const savedOrder = mapOrderRecord(updated);
 
-    void broadcastOrderEvent({
-      eventType: "order_status_updated",
-      orderId: savedOrder.id,
-      orderNumber: savedOrder.order_number,
-      orderStatus: savedOrder.order_status,
-      totalAmount: savedOrder.total_amount,
-      customerEmail: savedOrder.customer_email,
-      customerName: savedOrder.customer_name,
-      updatedAt: savedOrder.updated_at,
-    });
+    // If customer has a card on file, cut the cost off-session upon changing the value
+    const hasCard = Boolean((savedOrder.stripe_customer_id || currentOrder.stripe_customer_id) && (savedOrder.stripe_payment_method_id || currentOrder.stripe_payment_method_id));
+    const toCharge = !isPaid ? savedOrder.total_amount : savedOrder.total_amount > currentOrder.total_amount ? Math.round((savedOrder.total_amount - currentOrder.total_amount) * 100) / 100 : 0;
 
-    return savedOrder;
+    let cardCharged = false, chargedAmount = 0, chargeMessage = "Order updated successfully.";
+    if (toCharge > 0 && updates.charge_card !== false) {
+      if (hasCard) {
+        const chargeRes = await CardOnFileService.chargeCardOnFile(savedOrder.id, toCharge, savedOrder.total_amount);
+        if (!chargeRes.success) throw new Error(`Order saved, but Stripe card charge failed: ${chargeRes.error}`);
+        return { order: chargeRes.order || savedOrder, cardCharged: true, chargedAmount: toCharge, chargeMessage: `Order updated and customer's card was charged $${toCharge.toFixed(2)} successfully via Stripe.` };
+      }
+      chargeMessage = `Order updated. Note: No card on file found for customer. Total increased by $${toCharge.toFixed(2)}. Send payment link to collect payment.`;
+    }
+
+    void broadcastOrderEvent({
+      eventType: "order_status_updated", orderId: savedOrder.id, orderNumber: savedOrder.order_number,
+      orderStatus: savedOrder.order_status, totalAmount: savedOrder.total_amount,
+      customerEmail: savedOrder.customer_email, customerName: savedOrder.customer_name, updatedAt: savedOrder.updated_at,
+    });
+    return { order: savedOrder, cardCharged, chargedAmount, chargeMessage };
   }
 
   /**
@@ -173,27 +209,16 @@ export class OrderManagementService {
     const { data: ord } = await supabase.from("orders").select("id, order_number, customer_email").eq(col, orderId).maybeSingle();
     if (!ord) throw new Error("Order not found.");
 
-    // 1. Wipe all proof images from Supabase storage bucket
     try {
       const { data: proofs } = await supabase.from("order_proofs").select("photo_url").eq("order_id", ord.id);
-      const pathsToDelete: string[] = [];
-      for (const p of proofs || []) {
-        const path = extractProofStoragePath(p.photo_url);
-        if (path) pathsToDelete.push(path);
-      }
+      const paths = (proofs || []).map((p) => extractProofStoragePath(p.photo_url)).filter(Boolean) as string[];
       const { data: files } = await supabase.storage.from(STORAGE_BUCKETS.ORDER_PROOFS).list(`order-${ord.id}`);
-      if (files && files.length > 0) {
-        files.forEach((f) => pathsToDelete.push(`order-${ord.id}/${f.name}`));
-      }
-      const uniquePaths = Array.from(new Set(pathsToDelete));
-      if (uniquePaths.length > 0) {
-        await supabase.storage.from(STORAGE_BUCKETS.ORDER_PROOFS).remove(uniquePaths);
-      }
+      if (files?.length) files.forEach((f) => paths.push(`order-${ord.id}/${f.name}`));
+      if (paths.length > 0) await supabase.storage.from(STORAGE_BUCKETS.ORDER_PROOFS).remove(Array.from(new Set(paths)));
     } catch (storageErr) {
       console.warn("[deleteOrder] Error removing proof files from storage:", storageErr);
     }
 
-    // 2. Delete database records
     await supabase.from("order_proofs").delete().eq("order_id", ord.id);
     const { error } = await supabase.from("orders").delete().eq("id", ord.id);
     if (error) throw new Error(`Unable to delete order: ${error.message}`);
@@ -203,40 +228,19 @@ export class OrderManagementService {
       orderId: ord.id,
       orderNumber: ord.order_number,
       orderStatus: "cancelled",
-      customerEmail: ord.customer_email,
-      updatedAt: new Date().toISOString(),
+      customerEmail: ord.customer_email, updatedAt: new Date().toISOString(),
     });
-
     return true;
   }
 
-  /**
-   * Deletes a single proof photo from storage and database.
-   */
   static async deleteProof(orderId: string, proofId: string): Promise<boolean> {
     const supabase = createAdminSupabaseClient();
-    const { data: proof } = await supabase
-      .from("order_proofs")
-      .select("id, photo_url, order_id")
-      .eq("id", proofId)
-      .maybeSingle();
-
+    const { data: proof } = await supabase.from("order_proofs").select("id, photo_url").eq("id", proofId).maybeSingle();
     if (!proof) return false;
-
-    // Delete image file from Supabase Storage
-    const storagePath = extractProofStoragePath(proof.photo_url);
-    if (storagePath) {
-      try {
-        await supabase.storage.from(STORAGE_BUCKETS.ORDER_PROOFS).remove([storagePath]);
-      } catch (err) {
-        console.warn("[deleteProof] Error deleting file from storage:", err);
-      }
-    }
-
-    // Delete record from DB
+    const path = extractProofStoragePath(proof.photo_url);
+    if (path) await supabase.storage.from(STORAGE_BUCKETS.ORDER_PROOFS).remove([path]).catch(() => {});
     const { error } = await supabase.from("order_proofs").delete().eq("id", proofId);
     if (error) throw new Error(`Failed to delete proof: ${error.message}`);
-
     return true;
   }
 }

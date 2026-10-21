@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Scale, ShoppingBag, Lock } from "lucide-react";
+import { Scale, ShoppingBag, Lock, CreditCard } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/utils";
 import { useAdditionalItems } from "@/hooks/use-additional-items";
 import { ManualOrderAddItems } from "./manual-order-add-items";
@@ -18,17 +19,12 @@ interface OrderEditModalProps {
 
 export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: OrderEditModalProps) {
   const [mode, setMode] = React.useState<PricingMode>("per_bag");
-  const [bagCount, setBagCount] = React.useState(2);
-  const [bagRate, setBagRate] = React.useState(25);
-  const [weightLbs, setWeightLbs] = React.useState(15);
-  const [poundRate, setPoundRate] = React.useState(1.75);
+  const [bagCount, setBagCount] = React.useState(2), [bagRate, setBagRate] = React.useState(25);
+  const [weightLbs, setWeightLbs] = React.useState(15), [poundRate, setPoundRate] = React.useState(1.75);
   const [selectedAddItems, setSelectedAddItems] = React.useState<OrderAdditionalItemSelection[]>([]);
-  const [tipAmount, setTipAmount] = React.useState(0);
-  const [notes, setNotes] = React.useState("");
-  const [customerName, setCustomerName] = React.useState("");
-  const [customerPhone, setCustomerPhone] = React.useState("");
-  const [isSaving, setIsSaving] = React.useState(false);
-  const [error, setError] = React.useState("");
+  const [tipAmount, setTipAmount] = React.useState(0), [notes, setNotes] = React.useState("");
+  const [customerName, setCustomerName] = React.useState(""), [customerPhone, setCustomerPhone] = React.useState("");
+  const [isSaving, setIsSaving] = React.useState(false), [error, setError] = React.useState("");
   const { items: availableItems } = useAdditionalItems(true);
 
   React.useEffect(() => {
@@ -50,32 +46,34 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
   if (!order) return null;
 
   const isCompleted = order.order_status === "completed";
+  const isAlreadyPaid = order.payment_status === "paid";
+  const isLocked = isCompleted || isAlreadyPaid;
+
   const currentSubtotal = mode === "per_bag" ? Math.round(bagCount * bagRate * 100) / 100 : Math.round(weightLbs * poundRate * 100) / 100;
   const additionalItemsFee = selectedAddItems.reduce((acc, it) => acc + (it.price * it.quantity), 0) > 0
     ? Math.round(selectedAddItems.reduce((acc, it) => acc + (it.price * it.quantity), 0) * 100) / 100
     : Number(order.additional_items_fee || 0);
 
-  const detergentFee = Number(order.detergent_fee || 0);
-  const deliveryFee = Number(order.delivery_fee || 0);
-  const discountAmount = Number(order.discount_amount || 0);
-  const calculatedTotal = isCompleted
+  const detergentFee = Number(order.detergent_fee || 0), deliveryFee = Number(order.delivery_fee || 0), discountAmount = Number(order.discount_amount || 0);
+  const calculatedTotal = isLocked
     ? Number(order.total_amount || 0)
     : Math.max(0, Math.round((currentSubtotal + detergentFee + additionalItemsFee + deliveryFee + tipAmount - discountAmount) * 100) / 100);
 
+  const hasCardOnFile = Boolean(order.stripe_payment_method_id || (order.stripe_customer_id && (order.card_last4 || order.stripe_payment_method_id)));
+  const amountToCharge = !isAlreadyPaid ? calculatedTotal : 0;
+
   const handleUpdateAddItem = (item: AdditionalItem, delta: number) => {
-    if (isCompleted) return;
+    if (isLocked) return;
     setSelectedAddItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       const nextQty = Math.max(0, (existing?.quantity || 0) + delta);
       if (nextQty === 0) return prev.filter((i) => i.id !== item.id);
-      if (existing) return prev.map((i) => (i.id === item.id ? { ...i, quantity: nextQty } : i));
-      return [...prev, { id: item.id, name: item.name, price: item.price, quantity: nextQty }];
+      return existing ? prev.map((i) => (i.id === item.id ? { ...i, quantity: nextQty } : i)) : [...prev, { id: item.id, name: item.name, price: item.price, quantity: nextQty }];
     });
   };
 
   const handleAddCustomItem = (custom: { name: string; price: number }) => {
-    if (isCompleted) return;
-    setSelectedAddItems((prev) => [...prev, { id: `custom-${Date.now()}`, name: custom.name, price: custom.price, quantity: 1 }]);
+    if (!isLocked) setSelectedAddItems((prev) => [...prev, { id: `custom-${Date.now()}`, name: custom.name, price: custom.price, quantity: 1 }]);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -83,7 +81,7 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
     setIsSaving(true);
     setError("");
     try {
-      const payload = isCompleted
+      const payload = isLocked
         ? { customer_name: customerName.trim() || undefined, customer_phone: customerPhone.trim() || undefined, customer_notes: notes.trim() }
         : {
             pricing_mode: mode,
@@ -97,6 +95,7 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
       const res = await fetch(`/api/orders/${order.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to update order.");
+      toast.success(data.message || (data.cardCharged ? `Charged ${formatCurrency(data.chargedAmount || amountToCharge)} to customer card!` : "Order updated."));
       onOrderUpdated(data.order);
       onClose();
     } catch (err) {
@@ -111,17 +110,22 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
       <form onSubmit={handleSave} className="space-y-4 text-xs text-slate-700">
         {error && <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-semibold">{error}</div>}
 
-        {isCompleted && (
+        {isAlreadyPaid ? (
           <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center gap-2">
             <Lock className="h-4 w-4 text-amber-700 shrink-0" />
-            <span>Completed Order — Billing metrics are locked to preserve Stripe sync. Contact details &amp; notes editable.</span>
+            <span>Payment Settled — Charges already cut from customer card. Billing metrics cannot be altered again.</span>
           </div>
-        )}
+        ) : isCompleted ? (
+          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center gap-2">
+            <Lock className="h-4 w-4 text-amber-700 shrink-0" />
+            <span>Completed Order — Billing metrics are locked. Contact info and notes are editable.</span>
+          </div>
+        ) : null}
 
         {/* Pricing Mode Conversion Switch */}
         <div className="space-y-1.5">
           <label className="font-bold text-slate-800 uppercase text-[10px] tracking-wider flex items-center gap-1">
-            Service Plan Type {isCompleted && <span className="text-amber-700 font-bold lowercase text-[10px]">(locked)</span>}
+            Service Plan Type {isLocked && <span className="text-amber-700 font-bold lowercase text-[10px]">(locked)</span>}
           </label>
           <div className="grid grid-cols-2 gap-2">
             {[
@@ -129,12 +133,9 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
               { id: "per_lb" as const, label: "By the Pound (lbs)", icon: Scale },
             ].map(({ id, label, icon: Icon }) => (
               <button
-                key={id}
-                type="button"
-                disabled={isCompleted}
-                onClick={() => setMode(id)}
+                key={id} type="button" disabled={isLocked} onClick={() => setMode(id)}
                 className={`p-2 rounded-xl border flex items-center justify-center gap-2 font-bold transition-all ${
-                  isCompleted ? "opacity-60 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-500" :
+                  isLocked ? "opacity-60 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-500" :
                   mode === id ? "bg-pink-50 border-primary text-primary ring-1 ring-primary cursor-pointer" : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer"
                 }`}
               >
@@ -149,48 +150,34 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
           <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
             <div>
               <label className="block text-[11px] font-bold text-slate-700 mb-1">Number of Bags</label>
-              <input type="number" min="1" max="20" disabled={isCompleted} value={bagCount} onChange={(e) => setBagCount(parseInt(e.target.value, 10) || 1)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
+              <input type="number" min="1" max="20" disabled={isLocked} value={bagCount} onChange={(e) => setBagCount(parseInt(e.target.value, 10) || 1)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
             </div>
             <div>
               <label className="block text-[11px] font-bold text-slate-700 mb-1">Rate per Bag ($)</label>
-              <input type="number" step="0.50" min="5" disabled={isCompleted} value={bagRate} onChange={(e) => setBagRate(parseFloat(e.target.value) || 25)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
+              <input type="number" step="0.50" min="5" disabled={isLocked} value={bagRate} onChange={(e) => setBagRate(parseFloat(e.target.value) || 25)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
             <div>
               <label className="block text-[11px] font-bold text-slate-700 mb-1">Scale Weight (lbs)</label>
-              <input type="number" step="0.1" min="1" disabled={isCompleted} value={weightLbs} onChange={(e) => setWeightLbs(parseFloat(e.target.value) || 15)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
+              <input type="number" step="0.1" min="1" disabled={isLocked} value={weightLbs} onChange={(e) => setWeightLbs(parseFloat(e.target.value) || 15)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
             </div>
             <div>
               <label className="block text-[11px] font-bold text-slate-700 mb-1">Rate per Lb ($)</label>
-              <input type="number" step="0.05" min="0.5" disabled={isCompleted} value={poundRate} onChange={(e) => setPoundRate(parseFloat(e.target.value) || 1.75)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
+              <input type="number" step="0.05" min="0.5" disabled={isLocked} value={poundRate} onChange={(e) => setPoundRate(parseFloat(e.target.value) || 1.75)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-900 bg-white disabled:bg-slate-100" />
             </div>
           </div>
         )}
 
         {/* Additional & Specialty Items Selection */}
-        <ManualOrderAddItems
-          items={availableItems}
-          selected={selectedAddItems}
-          onUpdate={handleUpdateAddItem}
-          disabled={isCompleted}
-          onAddCustom={handleAddCustomItem}
-        />
+        <ManualOrderAddItems items={availableItems} selected={selectedAddItems} onUpdate={handleUpdateAddItem} disabled={isLocked} onAddCustom={handleAddCustomItem} />
 
         {/* Driver Tip & Specialty Items Summary */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-bold text-slate-700 mb-1">Driver Tip ($)</label>
-            <input
-              type="number"
-              step="1"
-              min="0"
-              disabled={isCompleted}
-              value={tipAmount}
-              onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)}
-              className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-emerald-700 bg-white disabled:bg-slate-100"
-            />
+            <input type="number" step="1" min="0" disabled={isLocked} value={tipAmount} onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-emerald-700 bg-white disabled:bg-slate-100" />
           </div>
           <div>
             <label className="block text-[11px] font-bold text-slate-700 mb-1">Specialty Items Fee</label>
@@ -201,7 +188,7 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
           </div>
         </div>
 
-        {/* Customer Contact Information */}
+        {/* Customer Contact & Notes */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-bold text-slate-700 mb-1">Customer Name</label>
@@ -212,8 +199,6 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
             <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900" />
           </div>
         </div>
-
-        {/* Notes */}
         <div>
           <label className="block text-[11px] font-bold text-slate-700 mb-1">Admin / Special Notes</label>
           <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900" placeholder="e.g. Added comforter per customer phone request" />
@@ -222,26 +207,39 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
         {/* Live Total Recalculation Bar */}
         <div className="p-3 rounded-xl bg-pink-50/50 border border-primary/20 flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-black uppercase text-slate-500 block">
-              {isCompleted ? "Original Settled Total (Paid)" : "Recalculated Total"}
-            </span>
-            <span className="text-xs text-slate-600">
-              {isCompleted ? "Locked to preserve Stripe sync" : `Subtotal: ${formatCurrency(currentSubtotal)} · Items: +${formatCurrency(additionalItemsFee)}`}
-            </span>
+            <span className="text-[10px] font-black uppercase text-slate-500 block">{isLocked ? "Settled Total" : "Recalculated Total"}</span>
+            <span className="text-xs text-slate-600">{isLocked ? "Charges settled — Contact details editable" : `Subtotal: ${formatCurrency(currentSubtotal)} · Items: +${formatCurrency(additionalItemsFee)}`}</span>
           </div>
           <span className="text-xl font-black text-slate-900 tracking-tight">{formatCurrency(calculatedTotal)}</span>
         </div>
+
+        {/* Card on file status and Stripe cut preview */}
+        {hasCardOnFile && amountToCharge > 0 ? (
+          <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-emerald-600 shrink-0" />
+              <div>
+                <span className="font-extrabold block">Card on File: {(order.card_brand || "Card").toUpperCase()} •••• {order.card_last4 || "Stored"}</span>
+                <span className="text-[11px] text-emerald-700">Order balance of {formatCurrency(amountToCharge)} will be charged via Stripe</span>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 font-black text-xs">+{formatCurrency(amountToCharge)}</span>
+          </div>
+        ) : !hasCardOnFile && calculatedTotal > 0 && !isAlreadyPaid ? (
+          <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-1.5">
+            <CreditCard className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+            <span>No card on file for this customer yet.</span>
+          </div>
+        ) : null}
 
         {/* Action Buttons */}
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
           <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSaving}>Cancel</Button>
           <Button type="submit" variant="hero" size="sm" disabled={isSaving} className="font-bold">
-            {isSaving ? "Saving Order..." : "Save Changes"}
+            {isSaving ? "Saving..." : isLocked ? "Save Details" : hasCardOnFile && amountToCharge > 0 ? `Save & Charge ${formatCurrency(amountToCharge)}` : "Save Changes"}
           </Button>
         </div>
       </form>
     </Dialog>
   );
 }
-
-

@@ -25,7 +25,7 @@ export interface ManualOrderFormState {
   delivery_slot: "8am-12pm" | "1pm-6pm";
   payment_method: "card" | "cash";
   payment_status: "paid" | "pending";
-  order_status: "confirmed" | "completed";
+  order_status: "pending" | "confirmed" | "completed";
   is_out_of_home: boolean;
   special_instructions: string;
   tip_amount: number;

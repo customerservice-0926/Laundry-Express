@@ -54,7 +54,7 @@ export default async function PricingPage() {
   const serviceSchema = getServiceSchema();
 
   return (
-    <div className="min-h-screen flex flex-col bg-white overflow-x-clip pt-12 sm:pt-16">
+    <div className="min-h-screen flex flex-col bg-white overflow-x-clip pt-12 sm:pt-16 max-md:pb-20">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}

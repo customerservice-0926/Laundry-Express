@@ -31,6 +31,12 @@ const nextConfig: NextConfig = {
     ],
   },
   poweredByHeader: false,
+  async redirects() {
+    return [
+      { source: "/plans", destination: "/pricing", permanent: true },
+      { source: "/signup", destination: "/register", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

@@ -204,11 +204,6 @@ export class ContentService {
         settings.closed_dates.some((d) => typeof d !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.trim())))) {
       throw new Error("Closed dates must be valid calendar dates (YYYY-MM-DD).");
     }
-    if (Object.prototype.hasOwnProperty.call(updates, "delivery_zones") &&
-      (!Array.isArray(settings.delivery_zones) || !settings.delivery_zones.length ||
-        settings.delivery_zones.some((zone) => typeof zone !== "string" || !zone.trim()))) {
-      throw new Error("Add at least one valid delivery area.");
-    }
     for (const key of ["slot1_start", "slot1_end", "slot2_start", "slot2_end"] as const) {
       if (Object.prototype.hasOwnProperty.call(updates, key) &&
         (typeof settings[key] !== "string" || !timePattern.test(settings[key]))) {

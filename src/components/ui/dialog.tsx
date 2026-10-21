@@ -103,30 +103,41 @@ export function Dialog({
           className
         )}
       >
-        {/* Fixed Header */}
-        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 shrink-0 bg-white">
-          <div className="min-w-0 pr-4">
-            {title && (
-              <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
-                {title}
-              </h3>
-            )}
-            {description && (
-              <p className="text-xs text-slate-500 mt-0.5 truncate">{description}</p>
-            )}
+        {/* Fixed Header (rendered only when title or description is provided) */}
+        {(title || description) ? (
+          <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 shrink-0 bg-white">
+            <div className="min-w-0 pr-4">
+              {title && (
+                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
+                  {title}
+                </h3>
+              )}
+              {description && (
+                <p className="text-xs text-slate-500 mt-0.5 truncate">{description}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              aria-label="Close dialog"
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
+        ) : (
           <button
             type="button"
             onClick={() => onOpenChange(false)}
             aria-label="Close dialog"
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            className="absolute top-4 right-4 z-20 p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
-        </div>
+        )}
 
-        {/* Single Dedicated Scrollable Content Area */}
-        <div className="p-5 sm:p-6 overflow-y-auto flex-1 overscroll-contain min-h-0">
+        {/* Dedicated Content Area */}
+        <div className={cn("p-5 sm:p-6 overflow-y-auto flex-1 overscroll-contain min-h-0", !title && !description && "pt-6 sm:pt-7")}>
           {children}
         </div>
       </div>

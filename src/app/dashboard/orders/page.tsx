@@ -25,7 +25,14 @@ export default function OrdersUnifiedPage() {
   const [checkoutStatus, setCheckoutStatus] = React.useState<"pending" | "confirmed" | "failed" | "cancelled" | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = React.useState(false);
 
+  const isRefreshingRef = React.useRef(false);
+  const lastRefreshTimeRef = React.useRef(0);
+
   const refreshSilently = React.useCallback(async () => {
+    const now = Date.now();
+    if (isRefreshingRef.current || now - lastRefreshTimeRef.current < 2500) return;
+    isRefreshingRef.current = true;
+    lastRefreshTimeRef.current = now;
     try {
       const res = await fetch("/api/orders", { cache: "no-store" });
       const data = await res.json();
@@ -33,7 +40,9 @@ export default function OrdersUnifiedPage() {
         setOrders(data.orders);
         setSelectedOrder((curr) => curr ? (data.orders.find((o: Order) => o.id === curr.id) || curr) : null);
       }
-    } catch {}
+    } catch {} finally {
+      isRefreshingRef.current = false;
+    }
   }, []);
 
   const { isLive } = useOrdersRealtime({
@@ -74,7 +83,7 @@ export default function OrdersUnifiedPage() {
         if (isCheckoutReturn) {
           const order = data.orders.find((item: Order) => item.order_number === orderNumber);
           if (order?.order_status === "cancelled") setCheckoutStatus("cancelled");
-          else if (order?.payment_status === "paid") setCheckoutStatus("confirmed");
+          else if (order?.payment_status === "paid" || order?.payment_status === "authorized" || order?.order_status === "confirmed") setCheckoutStatus("confirmed");
           else if (order?.payment_status === "failed") setCheckoutStatus("failed");
           else if (attempts < 30) {
             setCheckoutStatus("pending");
@@ -205,7 +214,7 @@ export default function OrdersUnifiedPage() {
             {filteredOrders.map((order) => (
               <div key={order.id} onClick={() => setSelectedOrder(order)} className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-pink-300 hover:shadow-xs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1.5">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-black text-slate-900">Order #{order.order_number}</span>
                     <Badge variant={order.order_status === "completed" ? "success" : "warning"} className="text-[10px] uppercase font-bold">{order.order_status.replace(/_/g, " ")}</Badge>
                     {order.proofs && order.proofs.length > 0 && (

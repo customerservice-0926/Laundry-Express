@@ -8,7 +8,6 @@ interface BookingSettings {
   slot1End: string;
   slot2Start: string;
   slot2End: string;
-  deliveryZones: { city: string; zip: string }[];
   operatingDays: string[];
   closedDates: string[];
 }
@@ -30,7 +29,6 @@ const EMPTY_SETTINGS: BookingSettings = {
   slot1End: "",
   slot2Start: "",
   slot2End: "",
-  deliveryZones: [],
   operatingDays: [],
   closedDates: [],
 };
@@ -75,13 +73,8 @@ export function useBookingConfig(initialPricing?: Partial<PricingConfig>) {
       if (settingsData.server_time) {
         setServerTime(settingsData.server_time);
       }
-      const rawZones: string[] = Array.isArray(s.delivery_zones) ? s.delivery_zones : [];
-      const deliveryZones = rawZones.map((item) => {
-        const match = item.match(/^(.+?)\s*\(([0-9]{5})\)$/);
-        return match ? { city: match[1].trim(), zip: match[2] } : { city: item, zip: "" };
-      });
-      if (!s.slot1_start || !s.slot1_end || !s.slot2_start || !s.slot2_end || deliveryZones.length === 0) {
-        throw new Error("Business hours, pickup windows, and coverage zones must be configured before orders can be placed.");
+      if (!s.slot1_start || !s.slot1_end || !s.slot2_start || !s.slot2_end) {
+        throw new Error("Business hours and pickup windows must be configured before orders can be placed.");
       }
       if (cancelled) return;
       setRates({
@@ -97,7 +90,6 @@ export function useBookingConfig(initialPricing?: Partial<PricingConfig>) {
         slot1End: s.slot1_end,
         slot2Start: s.slot2_start,
         slot2End: s.slot2_end,
-        deliveryZones,
         operatingDays,
         closedDates,
       });

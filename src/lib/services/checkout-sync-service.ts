@@ -72,38 +72,98 @@ export async function syncUserOrderContact(
 export async function syncStripeCheckoutSession(order: Order, sessionId: string): Promise<Order> {
   if (!sessionId || !stripe) return order;
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["setup_intent"] });
+    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["setup_intent", "payment_intent"] });
     if (!session) return order;
 
-    if (session.mode === "setup") {
-      const setupIntent = session.setup_intent as Stripe.SetupIntent | null;
+    if (session.mode === "setup" || session.metadata?.checkout_type === "initial_tip_delivery" || session.metadata?.checkout_type === "card_setup") {
       const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || "";
-      const paymentMethodId = typeof setupIntent?.payment_method === "string" ? setupIntent.payment_method : setupIntent?.payment_method?.id || "";
+      let paymentMethodId = "";
+      let paymentIntentId = "";
+
+      if (session.mode === "setup") {
+        const setupIntent = session.setup_intent as Stripe.SetupIntent | null;
+        paymentMethodId = typeof setupIntent?.payment_method === "string" ? setupIntent.payment_method : setupIntent?.payment_method?.id || "";
+      } else {
+        const piObj = session.payment_intent as Stripe.PaymentIntent | null;
+        paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || "";
+        if (piObj) {
+          paymentMethodId = typeof piObj.payment_method === "string" ? piObj.payment_method : piObj.payment_method?.id || "";
+        } else if (paymentIntentId) {
+          try {
+            const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+            paymentMethodId = typeof pi.payment_method === "string" ? pi.payment_method : pi.payment_method?.id || "";
+          } catch {}
+        }
+      }
+
       if (customerId && paymentMethodId) {
-        const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
-        const cardBrand = pm.card?.brand || "card";
-        const cardLast4 = pm.card?.last4 || "";
+        if (order.stripe_payment_method_id === paymentMethodId && (order.payment_status === "authorized" || order.payment_status === "paid")) {
+          return order;
+        }
+        let cardBrand = "card", cardLast4 = "";
+        try {
+          const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+          cardBrand = pm.card?.brand || "card";
+          cardLast4 = pm.card?.last4 || "";
+        } catch {}
         const updated = await OrderBillingService.recordCardAuthorized(order.id, {
           stripeCustomerId: customerId,
           stripePaymentMethodId: paymentMethodId,
           cardBrand,
           cardLast4,
         });
-        if (updated) return updated;
+        if (updated) {
+          if (paymentIntentId) {
+            await createAdminSupabaseClient().from("orders").update({ stripe_payment_intent_id: paymentIntentId }).eq("id", order.id);
+          }
+          return updated;
+        }
       }
     } else if (session.mode === "payment" && session.payment_status === "paid") {
+      if (order.payment_status === "paid" && (order.stripe_payment_method_id || order.stripe_payment_intent)) {
+        return order;
+      }
       const supabase = createAdminSupabaseClient();
-      const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || "";
-      await supabase
-        .from("orders")
-        .update({
-          payment_status: "paid",
-          order_status: order.order_status === "pending" ? "confirmed" : order.order_status,
-          stripe_payment_intent_id: paymentIntentId || undefined,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", order.id);
+      const piObj = session.payment_intent as Stripe.PaymentIntent | null;
+      const paymentIntentId = typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : session.payment_intent?.id || "";
+      let customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || "";
+      let paymentMethodId = "";
+      let cardBrand = "card";
+      let cardLast4 = "";
 
+      if (piObj) {
+        if (!customerId && piObj.customer) customerId = typeof piObj.customer === "string" ? piObj.customer : piObj.customer.id;
+        paymentMethodId = typeof piObj.payment_method === "string" ? piObj.payment_method : piObj.payment_method?.id || "";
+      } else if (paymentIntentId) {
+        try {
+          const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+          if (!customerId && pi.customer) customerId = typeof pi.customer === "string" ? pi.customer : pi.customer.id;
+          paymentMethodId = typeof pi.payment_method === "string" ? pi.payment_method : pi.payment_method?.id || "";
+        } catch {}
+      }
+
+      if (paymentMethodId) {
+        try {
+          const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+          cardBrand = pm.card?.brand || "card";
+          cardLast4 = pm.card?.last4 || "";
+        } catch {}
+      }
+
+      const updateData: Record<string, unknown> = {
+        payment_status: "paid",
+        order_status: order.order_status === "pending" ? "confirmed" : order.order_status,
+        stripe_payment_intent_id: paymentIntentId || undefined,
+        stripe_customer_id: customerId || undefined,
+        stripe_payment_method_id: paymentMethodId || undefined,
+        card_brand: cardBrand || undefined,
+        card_last4: cardLast4 || undefined,
+        updated_at: new Date().toISOString(),
+      };
+
+      await supabase.from("orders").update(updateData).eq("id", order.id);
       const refreshed = await OrderService.getOrderByNumber(order.id);
       if (refreshed) return refreshed;
     }

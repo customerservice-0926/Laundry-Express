@@ -20,6 +20,10 @@ export class OrderBillingService {
    * Records verified payment method on file when customer authorizes card for per-pound orders.
    */
   static async recordCardAuthorized(orderId: string, details: CardAuthDetails): Promise<Order | null> {
+    const current = await OrderService.getOrderByNumber(orderId);
+    if (current && (current.payment_status === "authorized" || current.order_status === "confirmed") && current.stripe_payment_method_id === details.stripePaymentMethodId) {
+      return current;
+    }
     const supabase = createAdminSupabaseClient();
     let { data, error } = await supabase
       .from("orders")
@@ -111,7 +115,9 @@ export class OrderBillingService {
     const subtotal = Math.round(weightLbs * poundRate * 100) / 100;
     const deliveryFee = weightLbs >= pricing.free_delivery_lbs ? 0 : pricing.standard_delivery_fee;
     const detergentFee = Number(order.detergent_fee || 0);
-    const totalAmount = Math.max(0, subtotal + detergentFee + deliveryFee - Number(order.discount_amount || 0));
+    const additionalItemsFee = Number(order.additional_items_fee || 0);
+    const tipAmount = Number(order.tip_amount || 0);
+    const totalAmount = Math.max(0, subtotal + detergentFee + additionalItemsFee + tipAmount + deliveryFee - Number(order.discount_amount || 0));
     const amountCents = Math.round(totalAmount * 100);
 
     const hasCardOnFile = Boolean(order.stripe_customer_id && order.stripe_payment_method_id && stripe);

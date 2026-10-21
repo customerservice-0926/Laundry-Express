@@ -32,7 +32,6 @@ interface StepOutOfHomeProps {
   onAddressDetailsChange?: (d: AddressDetails) => void;
   notes: string;
   onNotesChange: (v: string) => void;
-  deliveryZones?: { city: string; zip: string }[];
   showValidationErrors?: boolean;
 }
 
@@ -40,9 +39,8 @@ export function StepOutOfHome({
   currentUser, phone, onPhoneChange, isOutOfHome, onIsOutOfHomeChange,
   isAwayForDropoff, onIsAwayForDropoffChange, bagConfirmed, onBagConfirmedChange,
   address, onAddressChange, addressDetails, onAddressDetailsChange,
-  notes, onNotesChange, deliveryZones = [], showValidationErrors = false,
+  notes, onNotesChange, showValidationErrors = false,
 }: StepOutOfHomeProps) {
-  const defaultZone = deliveryZones[0] ?? { city: "", zip: "" };
   const [savedAddresses, setSavedAddresses] = React.useState<UserAddress[]>([]);
   const [selectedSavedId, setSelectedSavedId] = React.useState<string | null>(null);
   const [editingAddress, setEditingAddress] = React.useState<UserAddress | null>(null);
@@ -50,9 +48,9 @@ export function StepOutOfHome({
 
   const [street, setStreet] = React.useState(addressDetails?.street ?? "");
   const [apt, setApt] = React.useState(addressDetails?.apt ?? "");
-  const [city, setCity] = React.useState(addressDetails?.city ?? defaultZone.city);
+  const [city, setCity] = React.useState(addressDetails?.city ?? "");
   const [state, setState] = React.useState(addressDetails?.state || "IL");
-  const [zip, setZip] = React.useState(addressDetails?.zip ?? defaultZone.zip);
+  const [zip, setZip] = React.useState(addressDetails?.zip ?? "");
 
   const isInitialFetchDone = React.useRef(false);
   const isAddressInvalid = showValidationErrors && (
@@ -103,7 +101,7 @@ export function StepOutOfHome({
 
   const handleStartAddNew = () => {
     setSelectedSavedId(null); setEditingAddress(null); setIsAddingNew(true);
-    applyAddress("", "", defaultZone.city, "", defaultZone.zip);
+    applyAddress("", "", "", "", "");
   };
 
   const handleEditAddress = (addr: UserAddress) => {
@@ -133,7 +131,7 @@ export function StepOutOfHome({
         <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
           <MapPin className="h-3.5 w-3.5 text-primary" /> Pickup &amp; Delivery Address *
         </label>
-        <SavedAddressSelector savedAddresses={savedAddresses} selectedSavedId={selectedSavedId} onSelectSavedAddress={selectSavedAddress} isAddingNew={isAddingNew} onStartAddNew={handleStartAddNew} onEditAddress={handleEditAddress} deliveryZones={deliveryZones} />
+        <SavedAddressSelector savedAddresses={savedAddresses} selectedSavedId={selectedSavedId} onSelectSavedAddress={selectSavedAddress} isAddingNew={isAddingNew} onStartAddNew={handleStartAddNew} onEditAddress={handleEditAddress} />
         {isAddressInvalid && <p role="alert" className="text-xs font-medium text-rose-600">Enter a street address, city, 2-letter state code, and valid 5-digit ZIP code.</p>}
         {(isAddingNew || savedAddresses.length === 0) && (
           <NewAddressForm
@@ -143,7 +141,8 @@ export function StepOutOfHome({
             city={city} onCityChange={(v) => { setCity(v); push(street, apt, v, zip, state); }}
             state={state} onStateChange={(v) => { setState(v); push(street, apt, city, zip, v); }}
             zip={zip} onZipChange={(v) => { setZip(v); push(street, apt, city, v, state); }}
-            deliveryZones={deliveryZones} showValidationErrors={showValidationErrors}
+            onCityAndZipChange={(c, z) => { setCity(c); setZip(z); push(street, apt, c, z, state); }}
+            showValidationErrors={showValidationErrors}
             onAddressSaved={handleAddressSaved} hasSavedAddresses={savedAddresses.length > 0}
             onCancelAddNew={handleCancelForm} editingAddress={editingAddress}
           />

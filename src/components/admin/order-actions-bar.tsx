@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Edit3, Trash2, CreditCard, Scale, AlertTriangle, CheckCircle2, Link as LinkIcon } from "lucide-react";
+import { Edit3, Trash2, CreditCard, Scale, AlertTriangle, CheckCircle2, Send, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { toast } from "@/components/ui/toast";
@@ -20,13 +20,7 @@ interface OrderActionsBarProps {
 }
 
 export function OrderActionsBar({
-  order,
-  onClose,
-  onUpdateStatus,
-  onOpenProofModal,
-  onWeighOrder,
-  onOrderUpdated,
-  onOrderDeleted,
+  order, onClose, onUpdateStatus, onOpenProofModal, onWeighOrder, onOrderUpdated, onOrderDeleted,
 }: OrderActionsBarProps) {
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
@@ -34,25 +28,41 @@ export function OrderActionsBar({
 
   const isCompletedOrCancelled = order.order_status === "completed" || order.order_status === "cancelled";
   const hasCardOnFile = Boolean(order.stripe_customer_id && (order.stripe_payment_method_id || order.card_last4));
-  const isPaid = order.payment_status === "paid";
+  const isPaid = order.payment_status === "paid", isCash = order.payment_method === "cash";
 
   const handleChargeCard = async () => {
     setIsActionLoading(true);
     try {
-      const res = await fetch(`/api/orders/${order.id}/charge-card`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: order.total_amount }),
-      });
+      const res = await fetch(`/api/orders/${order.id}/charge-card`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: order.total_amount }) });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to charge card.");
       toast.success("Card charged successfully! Receipt emailed to customer.");
       if (data.order && onOrderUpdated) onOrderUpdated(data.order);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Unable to charge card.");
-    } finally {
-      setIsActionLoading(false);
-    }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to charge card."); }
+    finally { setIsActionLoading(false); }
+  };
+
+  const handleSendPaymentLink = async () => {
+    setIsActionLoading(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/send-payment-link`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to send payment link.");
+      toast.success(data.message || "Payment link sent to customer email!");
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to send payment link."); }
+    finally { setIsActionLoading(false); }
+  };
+
+  const handleRecordCashPayment = async () => {
+    setIsActionLoading(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payment_status: "paid" }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to record cash payment.");
+      toast.success("Cash payment recorded! Order marked paid.");
+      if (data.order && onOrderUpdated) onOrderUpdated(data.order);
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to record cash payment."); }
+    finally { setIsActionLoading(false); }
   };
 
   const handleDelete = async () => {
@@ -65,48 +75,39 @@ export function OrderActionsBar({
       setIsDeleteOpen(false);
       if (onOrderDeleted) onOrderDeleted(order.id);
       onClose();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Unable to delete order.");
-    } finally {
-      setIsActionLoading(false);
-    }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to delete order."); }
+    finally { setIsActionLoading(false); }
   };
 
   return (
     <div className="space-y-3 pt-3 border-t border-slate-100">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          {/* Edit / Convert is strictly hidden for completed or cancelled orders */}
-          {!isCompletedOrCancelled && (
-            <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)} className="text-slate-700">
-              <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit / Convert
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Send Payment Link if customer has not paid with card */}
+          {!isPaid && !isCash && !isCompletedOrCancelled && (
+            <Button variant="outline" size="sm" disabled={isActionLoading} onClick={handleSendPaymentLink} className="text-primary border-pink-200 hover:bg-pink-50 font-bold">
+              <Send className="h-3.5 w-3.5 mr-1" /> Send Payment Link
             </Button>
           )}
 
-          {!isPaid && hasCardOnFile && !isCompletedOrCancelled && (
-            <Button
-              variant="hero"
-              size="sm"
-              disabled={isActionLoading}
-              onClick={handleChargeCard}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-            >
-              <CreditCard className="h-3.5 w-3.5 mr-1" /> Charge Card (${order.total_amount.toFixed(2)})
+          {/* Record Cash Payment when cash is collected */}
+          {!isPaid && isCash && !isCompletedOrCancelled && (
+            <Button variant="hero" size="sm" disabled={isActionLoading} onClick={handleRecordCashPayment} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+              <DollarSign className="h-3.5 w-3.5 mr-1" /> Record Cash Paid (${order.total_amount.toFixed(2)})
             </Button>
           )}
 
+          {/* Edit / Adjust Charges is ONLY available before payment is cut and for active orders */}
           {!isPaid && !isCompletedOrCancelled && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                const url = `${window.location.origin}/order/pay/${order.order_number}`;
-                await navigator.clipboard.writeText(url);
-                toast.success("Payment checkout link copied to clipboard!");
-              }}
-              className="text-sky-700 border-sky-200 hover:bg-sky-50 font-bold"
-            >
-              <LinkIcon className="h-3.5 w-3.5 mr-1" /> Copy Payment Link
+            <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)} className="text-slate-700 font-bold">
+              <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit / Adjust Charges
+            </Button>
+          )}
+
+          {/* Charge Card cuts the cost from card on file once laundry is brought in / inspected */}
+          {!isPaid && hasCardOnFile && !isCompletedOrCancelled && order.total_amount > 0 && (
+            <Button variant="hero" size="sm" disabled={isActionLoading} onClick={handleChargeCard} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+              <CreditCard className="h-3.5 w-3.5 mr-1" /> Charge Card (${order.total_amount.toFixed(2)})
             </Button>
           )}
 
@@ -122,12 +123,12 @@ export function OrderActionsBar({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Weigh & Charge is only for active, uncompleted, weighed-by-pound orders */}
+          {/* Weigh & Charge is only for active, uncompleted, weighed-by-pound orders prior to payment */}
           {onWeighOrder && !isCompletedOrCancelled && order.pricing_mode === "per_lb" && !isPaid && (
             <Button
               variant="hero"
               size="sm"
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
               onClick={() => { onClose(); onWeighOrder(order); }}
             >
               <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Weigh &amp; Charge
@@ -138,24 +139,68 @@ export function OrderActionsBar({
             <Button
               variant="outline"
               size="sm"
-              className="text-rose-600 border-rose-200 hover:bg-rose-50"
+              className="text-rose-600 border-rose-200 hover:bg-rose-50 font-bold"
               onClick={() => { onClose(); onOpenProofModal(order, "damage"); }}
             >
               <AlertTriangle className="h-3.5 w-3.5 mr-1 shrink-0" /> Report Damage
             </Button>
           )}
 
-          {onUpdateStatus && order.order_status === "confirmed" && (
-            <Button
-              variant="hero"
-              size="sm"
-              disabled={isActionLoading}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={() => onUpdateStatus(order.id, "driver_assigned")}
-            >
-              <CheckCircle2 className="h-3.5 w-3.5 mr-1 shrink-0" /> Accept Order
-            </Button>
-          )}
+          {/* Contextual next-step action strictly mapped to current order status */}
+          {onUpdateStatus && (() => {
+            switch (order.order_status) {
+              case "pending":
+                return (
+                  <Button variant="hero" size="sm" disabled={isActionLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold" onClick={() => onUpdateStatus(order.id, "confirmed")}>
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1 shrink-0" /> Accept Order
+                  </Button>
+                );
+              case "confirmed":
+                return (
+                  <Button variant="hero" size="sm" disabled={isActionLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={() => onUpdateStatus(order.id, "driver_assigned")}>
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1 shrink-0" /> Assign Driver
+                  </Button>
+                );
+              case "driver_assigned":
+                return (
+                  <Button variant="hero" size="sm" disabled={isActionLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold" onClick={() => onUpdateStatus(order.id, "picked_up")}>
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1 shrink-0" /> Mark Picked Up
+                  </Button>
+                );
+              case "picked_up":
+                return (
+                  <Button variant="hero" size="sm" disabled={isActionLoading} className="bg-purple-600 hover:bg-purple-700 text-white font-bold" onClick={() => onUpdateStatus(order.id, "in_wash")}>
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1 shrink-0" /> Start Washing
+                  </Button>
+                );
+              case "in_wash":
+                return (
+                  <Button variant="hero" size="sm" disabled={isActionLoading} className="bg-amber-600 hover:bg-amber-700 text-white font-bold" onClick={() => onUpdateStatus(order.id, "out_for_delivery")}>
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1 shrink-0" /> Out for Delivery
+                  </Button>
+                );
+              case "out_for_delivery":
+                return (
+                  <Button
+                    variant="hero"
+                    size="sm"
+                    disabled={isActionLoading || order.payment_status === "pending"}
+                    className={order.payment_status === "pending" ? "bg-slate-400 cursor-not-allowed text-white font-bold" : "bg-slate-800 hover:bg-slate-900 text-white font-bold"}
+                    onClick={() => {
+                      if (order.payment_status === "pending") {
+                        toast.error("Cannot complete order while payment is pending. Charge card or collect payment first.");
+                        return;
+                      }
+                      onUpdateStatus(order.id, "completed");
+                    }}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1 shrink-0" /> Complete Order
+                  </Button>
+                );
+              default:
+                return null;
+            }
+          })()}
 
           {onUpdateStatus && !isCompletedOrCancelled && (
             <OrderCancelButton

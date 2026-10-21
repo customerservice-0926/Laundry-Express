@@ -78,7 +78,9 @@ export function orderToUnifiedInvoice(
         ? "Apple Pay (Stripe)"
         : order.payment_method === "google_pay"
           ? "Google Pay (Stripe)"
-          : order.payment_method || "Stripe 256-Bit Secure Checkout";
+          : order.payment_method === "cash"
+            ? "Cash on Delivery / Pickup"
+            : order.payment_method || "Stripe 256-Bit Secure Checkout";
 
   const detergentName = order.detergent_name || resolveDetergentName(order.detergent_id);
   const doorstepProtocol = order.is_out_of_home
@@ -92,7 +94,7 @@ export function orderToUnifiedInvoice(
   const transactionId =
     options?.transactionId ||
     order.stripe_payment_intent ||
-    `STRIPE-TX-${orderId.replace(/[^A-Za-z0-9]/g, "").slice(-8).toUpperCase()}`;
+    (order.payment_method === "cash" ? `CASH-${orderId}` : `STRIPE-TX-${orderId.replace(/[^A-Za-z0-9]/g, "").slice(-8).toUpperCase()}`);
 
   let parsedAdditionalItems: { name: string; price: number; quantity: number }[] = [];
   if (Array.isArray(order.additional_items)) {

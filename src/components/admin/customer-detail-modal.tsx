@@ -22,16 +22,13 @@ interface CustomerDetailModalProps {
   onClose: () => void;
   onCustomerUpdated?: (updated: CustomerAccount) => void;
   onCustomerDeleted?: (customerId: string) => void;
+  onCreateOrder?: (customer: CustomerAccount) => void;
 }
 
 type TabKey = "orders" | "payments" | "reviews";
 
 export function CustomerDetailModal({
-  customer,
-  isOpen,
-  onClose,
-  onCustomerUpdated,
-  onCustomerDeleted,
+  customer, isOpen, onClose, onCustomerUpdated, onCustomerDeleted, onCreateOrder,
 }: CustomerDetailModalProps) {
   const [activeTab, setActiveTab] = React.useState<TabKey>("orders");
   const [isEditOpen, setIsEditOpen] = React.useState(false);
@@ -207,40 +204,23 @@ export function CustomerDetailModal({
         {/* Footer */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
           <div className="flex items-center gap-2">
+            {onCreateOrder && (
+              <Button size="sm" onClick={() => { onClose(); onCreateOrder(customer); }} className="bg-primary hover:bg-primary/90 text-white font-bold">
+                <Phone className="h-3.5 w-3.5 mr-1" /> New Order
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)} className="text-slate-700">
-              <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit Profile
+              <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isDeleting}
-              onClick={() => setIsDeleteOpen(true)}
-              className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
-            >
+            <Button variant="outline" size="sm" disabled={isDeleting} onClick={() => setIsDeleteOpen(true)} className="text-rose-600 border-rose-200 hover:bg-rose-50">
               <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
             </Button>
           </div>
           <Button variant="outline" size="sm" onClick={onClose}>Close Profile</Button>
         </div>
       </div>
-      <CustomerEditModal
-        customer={customer}
-        isOpen={isEditOpen}
-        onClose={() => setIsEditOpen(false)}
-        onCustomerUpdated={(up) => {
-          if (onCustomerUpdated) onCustomerUpdated({ ...customer, ...up });
-          setIsEditOpen(false);
-        }}
-      />
-      <ConfirmModal
-        open={isDeleteOpen}
-        onOpenChange={setIsDeleteOpen}
-        onConfirm={handleDeleteCustomer}
-        title={`Delete Customer ${customer.full_name}?`}
-        description="This will permanently delete this customer account. Any completed orders will remain in history."
-        confirmText="Delete Customer"
-        isLoading={isDeleting}
-      />
+      <CustomerEditModal customer={customer} isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} onCustomerUpdated={(up) => { if (onCustomerUpdated) onCustomerUpdated({ ...customer, ...up }); setIsEditOpen(false); }} />
+      <ConfirmModal open={isDeleteOpen} onOpenChange={setIsDeleteOpen} onConfirm={handleDeleteCustomer} title={`Delete Customer ${customer.full_name}?`} description="Permanently delete this customer account. Any completed orders will remain in history." confirmText="Delete Customer" isLoading={isDeleting} />
     </Dialog>
   );
 }

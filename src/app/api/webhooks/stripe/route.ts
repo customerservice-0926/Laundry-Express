@@ -7,6 +7,7 @@ import { ContentService } from "@/lib/services/content-service";
 import { sendInvoiceEmail, type InvoiceEmailPayload } from "@/lib/services/email-service";
 import { orderToUnifiedInvoice } from "@/lib/invoice/invoice-utils";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import type { Order } from "@/types";
 
 export async function POST(req: NextRequest) {
   const stripeSecret = process.env.STRIPE_SECRET_KEY;
@@ -94,34 +95,55 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     throw new Error("checkout.session.completed is missing order metadata.");
   }
 
-  // Handle Per-Pound Setup Mode (Card Authorized on File)
-  if (session.mode === "setup") {
+  // Handle Card Setup or Initial Tip/Delivery hold (Card Authorized on File & Order Approved to Confirmed)
+  if (session.mode === "setup" || session.metadata?.checkout_type === "initial_tip_delivery" || session.metadata?.checkout_type === "card_setup") {
     const order = await OrderService.getOrderByNumber(identifier);
     if (!order) throw new Error(`Order ${identifier} not found for setup session.`);
 
-    const setupIntentId = typeof session.setup_intent === "string" ? session.setup_intent : session.setup_intent?.id;
-    const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || "";
+    let customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || "";
     let paymentMethodId = "";
+    let paymentIntentId = "";
     let cardBrand = "card";
     let cardLast4 = "";
 
-    if (setupIntentId && stripe) {
-      const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
-      paymentMethodId = typeof setupIntent.payment_method === "string" ? setupIntent.payment_method : setupIntent.payment_method?.id || "";
-      if (paymentMethodId) {
-        const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
-        cardBrand = pm.card?.brand || "card";
-        cardLast4 = pm.card?.last4 || "";
+    if (session.mode === "setup") {
+      const setupIntentId = typeof session.setup_intent === "string" ? session.setup_intent : session.setup_intent?.id;
+      if (setupIntentId && stripe) {
+        const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+        paymentMethodId = typeof setupIntent.payment_method === "string" ? setupIntent.payment_method : setupIntent.payment_method?.id || "";
+      }
+    } else {
+      paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || "";
+      if (paymentIntentId && stripe) {
+        try {
+          const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+          if (!customerId && pi.customer) customerId = typeof pi.customer === "string" ? pi.customer : pi.customer.id;
+          paymentMethodId = typeof pi.payment_method === "string" ? pi.payment_method : pi.payment_method?.id || "";
+        } catch {}
       }
     }
 
-    await OrderBillingService.recordCardAuthorized(order.id, {
+    if (paymentMethodId && stripe) {
+      try {
+        const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+        cardBrand = pm.card?.brand || "card";
+        cardLast4 = pm.card?.last4 || "";
+      } catch {}
+    }
+
+    const updatedOrder = await OrderBillingService.recordCardAuthorized(order.id, {
       stripeCustomerId: customerId,
       stripePaymentMethodId: paymentMethodId,
       cardBrand,
       cardLast4,
     });
-    console.info(`[stripe-webhook] Card verified & saved for per-pound order ${order.order_number}`);
+    if (paymentIntentId) {
+      await createAdminSupabaseClient().from("orders").update({ stripe_payment_intent_id: paymentIntentId }).eq("id", order.id);
+    }
+
+    const finalOrder = (await OrderService.getOrderByNumber(order.id)) || updatedOrder || order;
+    await sendInvoiceForSession(finalOrder, session, paymentIntentId);
+    console.info(`[stripe-webhook] Card verified, order approved & confirmation emailed for ${order.order_number}`);
     return;
   }
 
@@ -150,6 +172,26 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   let finalOrder = order;
   if (order.payment_status !== "paid") {
     const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+    let customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+    let paymentMethodId = "";
+    let cardBrand = "card";
+    let cardLast4 = "";
+
+    if (paymentIntentId && stripe) {
+      try {
+        const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+        if (!customerId && pi.customer) customerId = typeof pi.customer === "string" ? pi.customer : pi.customer.id;
+        paymentMethodId = typeof pi.payment_method === "string" ? pi.payment_method : pi.payment_method?.id || "";
+        if (paymentMethodId) {
+          const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+          cardBrand = pm.card?.brand || "card";
+          cardLast4 = pm.card?.last4 || "";
+        }
+      } catch (piErr) {
+        console.warn("[stripe-webhook] could not fetch PM for paid PI:", piErr);
+      }
+    }
+
     const updatedOrder = await OrderService.markOrderPaid(order.id, {
       stripe_payment_intent_id: paymentIntentId,
       customer_name: session.customer_details?.name || order.customer_name,
@@ -158,36 +200,40 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     });
     if (!updatedOrder) throw new Error(`Could not confirm paid order ${identifier}.`);
     finalOrder = updatedOrder;
+
+    if (customerId || paymentMethodId) {
+      const cardUpdates: Record<string, unknown> = {};
+      if (customerId) cardUpdates.stripe_customer_id = customerId;
+      if (paymentMethodId) cardUpdates.stripe_payment_method_id = paymentMethodId;
+      if (cardBrand) cardUpdates.card_brand = cardBrand;
+      if (cardLast4) cardUpdates.card_last4 = cardLast4;
+      await createAdminSupabaseClient().from("orders").update(cardUpdates).eq("id", order.id);
+      finalOrder = (await OrderService.getOrderByNumber(order.id)) || finalOrder;
+    }
+
     const { error } = await createAdminSupabaseClient().rpc("increment_coupon_usage_for_order", {
       order_id_input: order.id,
     });
     if (error) throw new Error(`Unable to record coupon use: ${error.message}`);
   }
 
-  // Generate and dispatch official invoice email to customer and admin
+  await sendInvoiceForSession(finalOrder, session, typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id);
+  console.info(`[stripe-webhook] Payment captured and invoice emailed for order ${finalOrder.order_number}`);
+}
+
+async function sendInvoiceForSession(order: Order, session: Stripe.Checkout.Session, txId?: string) {
+  if (!order.customer_email || order.customer_email.includes("@call.laundryexpress.local")) return;
   try {
     const settings = await ContentService.getSettings();
-    const invoicePayload = orderToUnifiedInvoice(finalOrder, {
-      slotTimes: settings
-        ? { s1: settings.slot1_start, e1: settings.slot1_end, s2: settings.slot2_start, e2: settings.slot2_end }
-        : undefined,
-      customerName: session.customer_details?.name || finalOrder.customer_name,
-      customerEmail: session.customer_details?.email || finalOrder.customer_email,
-      transactionId:
-        (typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id) ||
-        finalOrder.stripe_payment_intent ||
-        undefined,
+    const invoicePayload = orderToUnifiedInvoice(order, {
+      slotTimes: settings ? { s1: settings.slot1_start, e1: settings.slot1_end, s2: settings.slot2_start, e2: settings.slot2_end } : undefined,
+      customerName: session.customer_details?.name || order.customer_name,
+      customerEmail: session.customer_details?.email || order.customer_email,
+      transactionId: txId || order.stripe_payment_intent || undefined,
     });
-
-    if (!invoicePayload.customerEmail) {
-      throw new Error(`No customer email is available for paid order ${identifier}.`);
-    }
-
     await sendInvoiceEmail(invoicePayload as unknown as InvoiceEmailPayload);
-    await OrderService.markInvoiceEmailSent(finalOrder.id);
-    console.info(`[stripe-webhook] Payment captured and invoice emailed for order ${finalOrder.order_number}`);
-  } catch (emailErr: unknown) {
-    console.error("[stripe-webhook] Invoice email dispatch failed:", emailErr);
-    throw emailErr;
+    await OrderService.markInvoiceEmailSent(order.id);
+  } catch (err) {
+    console.error(`[stripe-webhook] Invoice dispatch failed for ${order.order_number}:`, err);
   }
 }

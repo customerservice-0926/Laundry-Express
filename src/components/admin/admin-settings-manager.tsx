@@ -3,7 +3,6 @@
 import * as React from "react";
 import { PricingSettingsForm } from "@/components/admin/settings/pricing-settings-form";
 import { ScheduleSettingsForm } from "@/components/admin/settings/schedule-settings-form";
-import { CoverageSettingsForm } from "@/components/admin/settings/coverage-settings-form";
 import type { BusinessSettings } from "@/lib/services/content-service";
 import type { PricingConfig } from "@/lib/services/pricing-plan-service";
 
@@ -63,7 +62,6 @@ export function AdminSettingsManager() {
     <div className="space-y-6">
       <PricingSettingsForm initialPricing={data.pricing} />
       <ScheduleSettingsForm initialSettings={data.settings} onSaved={refreshSettings} />
-      <CoverageSettingsForm initialSettings={data.settings} />
     </div>
   );
 }

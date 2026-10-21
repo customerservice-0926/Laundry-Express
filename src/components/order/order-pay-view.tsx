@@ -10,9 +10,10 @@ import type { Order } from "@/types";
 
 interface OrderPayViewProps {
   order: Order;
+  sessionId?: string;
 }
 
-export function OrderPayView({ order }: OrderPayViewProps) {
+export function OrderPayView({ order, sessionId }: OrderPayViewProps) {
   const [tipAmount, setTipAmount] = React.useState<number>(order.tip_amount || 0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState("");
@@ -38,14 +39,14 @@ export function OrderPayView({ order }: OrderPayViewProps) {
       const res = await fetch(`/api/orders/${order.order_number}/pay-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipAmount }),
+        body: JSON.stringify({ tipAmount, sessionId }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Unable to start payment checkout.");
       }
       if (data.alreadyPaid) {
-        window.location.href = `/order/success?order_id=${order.order_number}`;
+        window.location.href = `/order/success?order_id=${order.order_number}${sessionId ? `&session_id=${sessionId}` : ""}`;
         return;
       }
       if (data.url) {
@@ -70,7 +71,7 @@ export function OrderPayView({ order }: OrderPayViewProps) {
           Order <strong>#{order.order_number}</strong> has already been settled and scheduled for pickup.
         </p>
         <div className="pt-2">
-          <Link href={`/order/success?order_id=${order.order_number}`}>
+          <Link href={`/order/success?order_id=${order.order_number}${sessionId ? `&session_id=${sessionId}` : ""}`}>
             <Button variant="hero" size="sm" className="w-full">
               <span>View Order Receipt &amp; Invoice</span>
               <ArrowRight className="h-3.5 w-3.5 ml-1" />
@@ -176,8 +177,14 @@ export function OrderPayView({ order }: OrderPayViewProps) {
       <div className="p-5 rounded-3xl bg-slate-900 text-white shadow-xl space-y-4">
         <div className="space-y-1.5 text-xs">
           <div className="flex justify-between text-slate-300">
-            <span>Order Subtotal</span>
-            <span>{formatCurrency(baseAmount)}</span>
+            <span>Estimated Laundry Service</span>
+            <span>{formatCurrency(baseAmount)} <span className="text-[10px] text-slate-400 font-normal">(Charged after pickup)</span></span>
+          </div>
+          <div className="flex justify-between text-slate-300">
+            <span>Doorstep Delivery Fee</span>
+            <span className={order.delivery_fee === 0 ? "text-emerald-400 font-bold" : "text-white"}>
+              {order.delivery_fee === 0 ? "FREE ($0.00)" : formatCurrency(order.delivery_fee)}
+            </span>
           </div>
           {tipAmount > 0 && (
             <div className="flex justify-between text-emerald-400 font-bold">
@@ -186,8 +193,10 @@ export function OrderPayView({ order }: OrderPayViewProps) {
             </div>
           )}
           <div className="flex justify-between text-base font-black text-white pt-2 border-t border-slate-800">
-            <span>Total Payable</span>
-            <span className="text-xl text-primary font-black">{formatCurrency(totalWithTip)}</span>
+            <span>Due Today</span>
+            <span className="text-xl text-primary font-black">
+              {formatCurrency(Math.max(0, Math.round(((order.delivery_fee || 0) + tipAmount) * 100) / 100))}
+            </span>
           </div>
         </div>
 
@@ -204,10 +213,16 @@ export function OrderPayView({ order }: OrderPayViewProps) {
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
               <span>Redirecting to Stripe...</span>
             </>
+          ) : ((order.delivery_fee || 0) + tipAmount) > 0 ? (
+            <>
+              <Lock className="h-4 w-4 mr-2" />
+              <span>Pay {formatCurrency((order.delivery_fee || 0) + tipAmount)} &amp; Save Card on File</span>
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </>
           ) : (
             <>
               <Lock className="h-4 w-4 mr-2" />
-              <span>Pay {formatCurrency(totalWithTip)} with Card / Apple Pay</span>
+              <span>Save &amp; Authorize Card ($0.00 Due Today)</span>
               <ArrowRight className="h-4 w-4 ml-2" />
             </>
           )}
@@ -215,7 +230,7 @@ export function OrderPayView({ order }: OrderPayViewProps) {
 
         <p className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1.5">
           <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-          <span>Encrypted 256-bit Stripe Checkout &bull; Zero card details stored locally</span>
+          <span>Card saved securely with Stripe &bull; Laundry service charged upon pickup</span>
         </p>
       </div>
     </div>

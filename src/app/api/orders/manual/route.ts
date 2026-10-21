@@ -7,11 +7,13 @@ import { OrderService } from "@/lib/services/order-service";
 import { PricingPlanService } from "@/lib/services/pricing-plan-service";
 import { CatalogService } from "@/lib/services/catalog-service";
 import { ContentService } from "@/lib/services/content-service";
+import { calculateDeliveryRadius } from "@/lib/services/geo-radius-service";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { broadcastOrderEvent } from "@/lib/services/order-realtime-service";
 import { mapOrderRecord } from "@/lib/services/order-record-mapper";
 import { CustomerService } from "@/lib/services/customer-service";
 import { CardOnFileService } from "@/lib/services/card-on-file-service";
+import { OrderPaymentLinkService } from "@/lib/services/order-payment-link-service";
 import { orderToUnifiedInvoice } from "@/lib/invoice/invoice-utils";
 import { sendInvoiceEmail, type InvoiceEmailPayload } from "@/lib/services/email-service";
 import type { OrderStatus, PricingMode, OrderAdditionalItemSelection } from "@/types";
@@ -38,7 +40,7 @@ interface ManualOrderPayload {
   delivery_date?: string;
   payment_method: "card" | "cash";
   payment_status?: "paid" | "pending";
-  order_status?: "confirmed" | "completed";
+  order_status?: "pending" | "confirmed" | "completed";
   is_out_of_home?: boolean;
   special_instructions?: string;
   tip_amount?: number;
@@ -124,33 +126,28 @@ export async function POST(req: NextRequest) {
       subtotal = mode === "per_bag" ? bagCount * 25 : estWeight * 1.75;
     }
 
-    const settings = await ContentService.getSettings();
-    if (settings?.delivery_zones?.length) {
-      const cleanZip = zip.trim(), cleanCity = city.trim().toLowerCase();
-      const isCovered = settings.delivery_zones.some((zStr) => {
-        const match = zStr.trim().match(/^(.+?)(?:\s*\(([0-9]{5})\))?$/);
-        if (!match) return false;
-        const zCity = match[1].trim().toLowerCase(), zZip = match[2]?.trim();
-        return zZip && cleanZip ? zZip === cleanZip : zCity === cleanCity;
-      });
-      if (!isCovered) return NextResponse.json({ success: false, error: `Address outside active delivery zones: ${settings.delivery_zones.join(", ")}` }, { status: 400 });
+    const geo = calculateDeliveryRadius(zip, city, pricing?.standard_delivery_fee);
+    if (!geo.isServiceable) {
+      return NextResponse.json({ success: false, error: geo.message || "Address outside our 40-mile delivery radius." }, { status: 400 });
     }
 
     const addItems = Array.isArray(body.additional_items) ? body.additional_items : [];
     const additionalItemsFee = addItems.reduce((acc, it) => acc + (Number(it.price || 0) * Math.max(1, Number(it.quantity) || 1)), 0);
-    let deliveryFee = 0;
-    if (mode === "per_bag") {
-      const freeThreshold = pricing?.free_delivery_threshold ?? 2;
-      deliveryFee = bagCount >= freeThreshold ? 0 : Number(pricing?.standard_delivery_fee ?? 0);
-    } else if (mode === "per_lb") {
-      const freeLbsThreshold = pricing?.free_delivery_lbs ?? 30;
-      deliveryFee = estWeight >= freeLbsThreshold ? 0 : Number(pricing?.standard_delivery_fee ?? 0);
-    }
+    const deliveryFee = geo.deliveryFee;
+    const distanceMiles = geo.distanceMiles;
     const tipAmount = Math.max(0, Number(body.tip_amount) || 0);
     const totalAmount = Math.max(0, Math.round((subtotal + detergentFee + additionalItemsFee + deliveryFee + tipAmount) * 100) / 100);
     const isPaid = body.payment_status === "paid";
+    if (!isPaid && body.order_status === "completed") {
+      return NextResponse.json({ success: false, error: "Cannot create an order with status 'completed' while payment is pending." }, { status: 400 });
+    }
+    if (isPaid && body.order_status === "pending") {
+      return NextResponse.json({ success: false, error: "Order status cannot be pending when payment has been received." }, { status: 400 });
+    }
     const paymentMethod = body.payment_method === "cash" ? "cash" : "card";
-    const targetStatus: OrderStatus = body.order_status === "completed" ? "completed" : "confirmed";
+    const targetStatus: OrderStatus = isPaid
+      ? (body.order_status === "completed" ? "completed" : "confirmed")
+      : (body.order_status === "confirmed" ? "confirmed" : "pending");
 
     let customerUserId: string | undefined;
     try {
@@ -169,7 +166,7 @@ export async function POST(req: NextRequest) {
       additional_items: addItems, additional_items_fee: additionalItemsFee,
       detergent_id: detergentId, detergent_name: detergentName, detergent_fee: detergentFee,
       pickup_date: pickupDate, pickup_slot: pickupSlot, delivery_date: sanitizeText(body.delivery_date) || null,
-      subtotal, delivery_fee: deliveryFee, distance_miles: 0, distance_surcharge: 0,
+      subtotal, delivery_fee: deliveryFee, distance_miles: distanceMiles, distance_surcharge: deliveryFee,
       tip_amount: tipAmount,
       total_amount: totalAmount, payment_method: paymentMethod, is_out_of_home: Boolean(body.is_out_of_home),
       bag_outside_door_confirmed: Boolean(body.is_out_of_home), customer_notes: specialInstructions,
@@ -206,38 +203,37 @@ export async function POST(req: NextRequest) {
     const finalOrder = updatedRecord ? mapOrderRecord(updatedRecord) : createdOrder;
 
     void broadcastOrderEvent({
-      eventType: isPaid ? "order_paid" : "order_created",
-      orderId: finalOrder.id,
-      orderNumber: finalOrder.order_number,
-      orderStatus: finalOrder.order_status,
-      paymentStatus: finalOrder.payment_status,
-      customerEmail: finalOrder.customer_email,
-      customerName: finalOrder.customer_name,
-      totalAmount: finalOrder.total_amount,
-      pickupDate: finalOrder.pickup_date,
-      pickupSlot: finalOrder.pickup_slot,
-      updatedAt: finalOrder.updated_at,
+      eventType: isPaid ? "order_paid" : "order_created", orderId: finalOrder.id, orderNumber: finalOrder.order_number,
+      orderStatus: finalOrder.order_status, paymentStatus: finalOrder.payment_status, customerEmail: finalOrder.customer_email,
+      customerName: finalOrder.customer_name, totalAmount: finalOrder.total_amount, pickupDate: finalOrder.pickup_date,
+      pickupSlot: finalOrder.pickup_slot, updatedAt: finalOrder.updated_at,
     });
 
-    // Automatically send invoice email if customer provided real email
-    let emailSent = false;
+    // If order is paid or cash, send invoice confirmation. For unpaid card orders, send 30-min checkout link.
+    let emailSent = false, checkoutLink = cardSetupUrl;
     const isRealEmail = rawEmail && !rawEmail.includes("@call.laundryexpress.local") && body.send_email_copy !== false;
     if (isRealEmail) {
       try {
-        const settings = await ContentService.getSettings();
-        const invoicePayload = orderToUnifiedInvoice(finalOrder, {
-          customerEmail: rawEmail,
-          slotTimes: settings ? { s1: settings.slot1_start, e1: settings.slot1_end, s2: settings.slot2_start, e2: settings.slot2_end } : undefined,
-        });
-        await sendInvoiceEmail(invoicePayload as unknown as InvoiceEmailPayload);
-        await OrderService.markInvoiceEmailSent(finalOrder.id);
-        emailSent = true;
+        if (isPaid || paymentMethod === "cash") {
+          const settings = await ContentService.getSettings();
+          const invoicePayload = orderToUnifiedInvoice(finalOrder, {
+            customerEmail: rawEmail,
+            slotTimes: settings ? { s1: settings.slot1_start, e1: settings.slot1_end, s2: settings.slot2_start, e2: settings.slot2_end } : undefined,
+          });
+          await sendInvoiceEmail(invoicePayload as unknown as InvoiceEmailPayload);
+          await OrderService.markInvoiceEmailSent(finalOrder.id);
+          emailSent = true;
+        } else {
+          const linkRes = await OrderPaymentLinkService.createAndSendPaymentLink(finalOrder.id, req.nextUrl.origin, { sendEmail: true, expiresInMinutes: 30 });
+          emailSent = linkRes.emailSent;
+          checkoutLink = linkRes.checkoutUrl;
+        }
       } catch (err) {
-        console.error("[manual-order] Error sending invoice email:", err);
+        console.error("[manual-order] Error sending order email:", err);
       }
     }
 
-    return NextResponse.json({ success: true, order: finalOrder, emailSent, setupUrl: cardSetupUrl });
+    return NextResponse.json({ success: true, order: finalOrder, emailSent, setupUrl: paymentMethod === "card" ? checkoutLink : undefined });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to record manual phone order.";
     return NextResponse.json({ success: false, error: message }, { status: 500 });

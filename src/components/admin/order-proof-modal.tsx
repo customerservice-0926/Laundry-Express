@@ -85,6 +85,10 @@ export function OrderProofModal({
   };
 
   const handleSkip = () => {
+    if (proofType === "dropoff" && order.payment_status === "pending") {
+      setErrorMsg("Cannot mark order completed while payment is pending. Please collect payment first.");
+      return;
+    }
     onSkip(order.id, proofType);
     onClose();
   };
@@ -107,6 +111,13 @@ export function OrderProofModal({
           <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
             <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {proofType === "dropoff" && order.payment_status === "pending" && (
+          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center gap-2 font-medium">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+            <span>Payment is pending. Please collect payment or charge customer card before marking order completed.</span>
           </div>
         )}
 

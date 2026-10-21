@@ -21,7 +21,7 @@ export interface CalculatePriceInput {
   max_bags: number;
   min_lbs: number;
   max_lbs: number;
-  free_delivery_lbs?: number;
+  standard_delivery_fee?: number;
   one_bag_delivery_fee?: number;
   free_delivery_threshold?: number;
   package?: { price: number; capacity: number; unit_type: "bag" | "lb" };
@@ -107,16 +107,12 @@ export function calculateOrderPrice(input: CalculatePriceInput): CalculatedPrice
     ) / 100
   );
 
-  // 4. Delivery fee based on admin pricing configuration and free delivery thresholds
+  // 4. Distance-based delivery fee: Free within 30 miles; $10 (or standard_delivery_fee) for 30-40 miles
+  const distanceMiles = Math.max(0, Number(input.distance_miles || 0));
+  const extendedFee = Number(input.standard_delivery_fee ?? input.one_bag_delivery_fee ?? 10);
   let deliveryFee = 0;
-  if (input.pricing_mode === "per_bag") {
-    const freeThreshold = input.free_delivery_threshold ?? 2;
-    deliveryFee = unitCount >= freeThreshold ? 0 : (input.one_bag_delivery_fee ?? 0);
-  } else if (input.pricing_mode === "per_lb") {
-    const freePoundThreshold = input.free_delivery_lbs ?? 30;
-    deliveryFee = unitCount >= freePoundThreshold ? 0 : (input.one_bag_delivery_fee ?? 0);
-  } else if (input.pricing_mode === "package") {
-    deliveryFee = 0;
+  if (distanceMiles > 30 && distanceMiles <= 40) {
+    deliveryFee = extendedFee;
   }
 
   // 5. Driver / service tip
@@ -149,8 +145,8 @@ export function calculateOrderPrice(input: CalculatePriceInput): CalculatedPrice
     additional_items_fee: additionalItemsFee,
     additional_items: additionalItems,
     delivery_fee: deliveryFee,
-    distance_miles: 0,
-    distance_surcharge: 0,
+    distance_miles: distanceMiles,
+    distance_surcharge: deliveryFee,
     tip_amount: tipAmount,
     discount_amount: discountAmount,
     tax_amount: taxAmount,

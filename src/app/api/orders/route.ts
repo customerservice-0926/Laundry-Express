@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { OrderService } from "@/lib/services/order-service";
 import { sendOrderCancellationEmail } from "@/lib/services/cancellation-email";
+import { sendReviewRequestEmail } from "@/lib/services/email-service";
 import { getVerifiedUser } from "@/lib/auth-request";
 import type { OrderStatus } from "@/types";
 
@@ -175,7 +176,44 @@ export async function PATCH(req: NextRequest) {
           order: cancelledOrder,
         });
       }
+      if (validatedStatus === "completed") {
+        const existingOrd = await OrderService.getOrderByNumber(orderId);
+        if (!existingOrd) return NextResponse.json({ success: false, error: "Order not found." }, { status: 404 });
+        if (existingOrd.payment_status === "pending" || existingOrd.payment_status === "failed") {
+          return NextResponse.json({ success: false, error: "Cannot mark order as completed while payment is pending. Collect payment first." }, { status: 400 });
+        }
+      }
+      if (validatedStatus === "pending") {
+        const existingOrd = await OrderService.getOrderByNumber(orderId);
+        if (!existingOrd) return NextResponse.json({ success: false, error: "Order not found." }, { status: 404 });
+        if (existingOrd.payment_status === "paid") {
+          return NextResponse.json({ success: false, error: "Order status cannot be pending when payment has already been received." }, { status: 400 });
+        }
+      }
       await OrderService.updateOrderStatus(orderId, validatedStatus);
+      if (validatedStatus === "completed") {
+        try {
+          const completedOrder = await OrderService.getOrderByNumber(orderId);
+          if (completedOrder?.customer_email) {
+            const origin = req.nextUrl.origin || process.env.NEXT_PUBLIC_APP_URL || "https://laundryexpress.com";
+            const planName = completedOrder.pricing_mode === "per_bag"
+              ? `${completedOrder.bag_count || 1} Bag(s)`
+              : completedOrder.pricing_mode === "per_lb"
+              ? `By the Pound (${completedOrder.final_weight_lbs || completedOrder.estimated_weight_lbs || 15} lbs)`
+              : "Wash & Fold Package";
+            await sendReviewRequestEmail({
+              orderNumber: completedOrder.order_number,
+              customerName: completedOrder.customer_name || "Valued Customer",
+              customerEmail: completedOrder.customer_email,
+              deliveryDate: completedOrder.delivery_date || undefined,
+              planName,
+              reviewUrl: `${origin}/dashboard/ratings?order_id=${encodeURIComponent(completedOrder.order_number)}`,
+            });
+          }
+        } catch (err) {
+          console.error("[orders-api] Review request email failed:", err);
+        }
+      }
     }
     if (typeof finalWeight === "number") {
       await OrderService.updateFinalWeight(orderId, finalWeight);

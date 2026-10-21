@@ -74,11 +74,21 @@ export function ManualOrderStep3({
           <label className="block text-[11px] font-semibold text-slate-700 mb-1">Payment Status</label>
           <select
             value={form.payment_status}
-            onChange={(e) => onChange("payment_status", e.target.value as "paid" | "pending")}
+            onChange={(e) => {
+              const nextPayment = e.target.value as "paid" | "pending";
+              onChange("payment_status", nextPayment);
+              if (nextPayment === "paid" && form.order_status === "pending") {
+                onChange("order_status", "confirmed");
+              } else if (nextPayment === "pending" && form.order_status === "completed") {
+                onChange("order_status", "confirmed");
+              }
+            }}
             className="w-full h-9 px-3 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
           >
+            <option value="pending">
+              {form.payment_method === "cash" ? "Pending (Collect Cash on Delivery/Pickup)" : "Pending (Send Checkout Link / Collect Card)"}
+            </option>
             <option value="paid">Paid (Payment Received)</option>
-            <option value="pending">Pending (Send Invoice / Collect)</option>
           </select>
         </div>
 
@@ -88,12 +98,24 @@ export function ManualOrderStep3({
           </label>
           <select
             value={form.order_status}
-            onChange={(e) => onChange("order_status", e.target.value as "confirmed" | "completed")}
+            onChange={(e) => onChange("order_status", e.target.value as "pending" | "confirmed" | "completed")}
             className="w-full h-9 px-3 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
           >
+            {form.payment_status !== "paid" && (
+              <option value="pending">
+                {form.payment_method === "cash" ? "Pending (Awaiting Pickup & Cash Payment)" : "Pending (Awaiting Card & Confirmation)"}
+              </option>
+            )}
             <option value="confirmed">Confirmed (Scheduled for Pickup)</option>
-            <option value="completed">Completed (Finished &amp; Delivered)</option>
+            {form.payment_status === "paid" && (
+              <option value="completed">Completed (Finished &amp; Delivered)</option>
+            )}
           </select>
+          {form.payment_status === "paid" ? (
+            <p className="text-[10px] text-emerald-600 mt-1 font-medium">Payment received: Order is confirmed or completed.</p>
+          ) : (
+            <p className="text-[10px] text-amber-600 mt-1 font-medium">Payment pending: Order cannot be marked completed.</p>
+          )}
         </div>
       </div>
 
@@ -102,7 +124,11 @@ export function ManualOrderStep3({
         <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-slate-700">
             <Mail className="h-4 w-4 text-primary shrink-0" />
-            <span>Send invoice &amp; card setup link to <strong>{form.customer_email}</strong></span>
+            <span>
+              {form.payment_method === "cash"
+                ? <>Send order confirmation invoice to <strong>{form.customer_email}</strong></>
+                : <>Send invoice &amp; card setup link to <strong>{form.customer_email}</strong></>}
+            </span>
           </div>
           <input
             type="checkbox"
@@ -119,7 +145,9 @@ export function ManualOrderStep3({
           <Heart className="h-4 w-4 text-emerald-600 fill-emerald-600 shrink-0" />
           <span className="font-semibold text-slate-700">Driver &amp; Team Tip</span>
         </div>
-        <span className="text-[11px] font-medium text-slate-500">Selected by customer on payment link</span>
+        <span className="text-[11px] font-medium text-slate-500">
+          {form.payment_method === "cash" ? "Cash tip given directly to driver" : "Selected by customer on payment link"}
+        </span>
       </div>
 
       {/* Itemized Price Summary Box */}

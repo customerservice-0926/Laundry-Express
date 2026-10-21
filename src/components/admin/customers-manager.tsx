@@ -6,6 +6,8 @@ import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CustomerCard } from "./customer-card";
 import { CustomerDetailModal, CustomerAccount } from "./customer-detail-modal";
+import { ManualOrderModal } from "./manual-order-modal";
+import type { ManualOrderFormState } from "./manual-order-types";
 
 interface CustomersManagerProps {
   customers: CustomerAccount[];
@@ -15,10 +17,28 @@ export function CustomersManager({ customers }: CustomersManagerProps) {
   const [customerList, setCustomerList] = React.useState<CustomerAccount[]>(customers);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedCustomer, setSelectedCustomer] = React.useState<CustomerAccount | null>(null);
+  const [orderModalCustomer, setOrderModalCustomer] = React.useState<Partial<ManualOrderFormState> | null>(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     setCustomerList(customers);
   }, [customers]);
+
+  const handleStartOrder = (cust: CustomerAccount) => {
+    const latestOrder = cust.orders?.[0];
+    const isPhoneDummy = cust.email.includes("@call.laundryexpress.local");
+    setOrderModalCustomer({
+      customer_name: cust.full_name,
+      customer_phone: cust.phone !== "—" ? cust.phone : "",
+      customer_email: isPhoneDummy ? "" : cust.email,
+      street_address: latestOrder?.street_address || (cust.address !== "—" ? cust.address.split(",")[0]?.trim() : "") || "",
+      apt_unit: latestOrder?.apt_unit || "",
+      city: latestOrder?.city || "Lake in the Hills",
+      state: latestOrder?.state || "IL",
+      zip_code: latestOrder?.zip_code || "60156",
+    });
+    setIsOrderModalOpen(true);
+  };
 
   const filteredCustomers = React.useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
@@ -170,15 +190,12 @@ export function CustomersManager({ customers }: CustomersManagerProps) {
                         {formatCurrency(custTotalSpent)}
                       </td>
 
-                      <td className="p-3.5 text-right whitespace-nowrap min-w-[120px]">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs text-slate-700 hover:text-primary"
-                          onClick={() => setSelectedCustomer(cust)}
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1 shrink-0" />
-                          View Profile
+                      <td className="p-3.5 text-right whitespace-nowrap min-w-[140px] space-x-1">
+                        <Button size="sm" className="h-7 px-2 text-[11px] bg-primary/10 text-primary hover:bg-primary hover:text-white font-bold" onClick={() => handleStartOrder(cust)}>
+                          <Phone className="h-3 w-3 mr-1" /> Order
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] text-slate-700 hover:text-primary" onClick={() => setSelectedCustomer(cust)}>
+                          <Eye className="h-3 w-3 mr-1" /> Profile
                         </Button>
                       </td>
                     </tr>
@@ -198,29 +215,27 @@ export function CustomersManager({ customers }: CustomersManagerProps) {
           </div>
         ) : (
           filteredCustomers.map((cust) => (
-            <CustomerCard
-              key={cust.id}
-              customer={cust}
-              onSelectCustomer={(c) => setSelectedCustomer(c)}
-            />
+            <CustomerCard key={cust.id} customer={cust} onSelectCustomer={(c) => setSelectedCustomer(c)} />
           ))
         )}
       </div>
 
-      {/* Customer Full Detail & History Modal */}
       <CustomerDetailModal
         customer={selectedCustomer}
         isOpen={!!selectedCustomer}
         onClose={() => setSelectedCustomer(null)}
-        onCustomerUpdated={(updated) => {
-          setCustomerList((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-          setSelectedCustomer(updated);
-        }}
-        onCustomerDeleted={(customerId) => {
-          setCustomerList((prev) => prev.filter((c) => c.id !== customerId));
-          setSelectedCustomer(null);
-        }}
+        onCreateOrder={handleStartOrder}
+        onCustomerUpdated={(up) => { setCustomerList((prev) => prev.map((c) => (c.id === up.id ? up : c))); setSelectedCustomer(up); }}
+        onCustomerDeleted={(id) => { setCustomerList((prev) => prev.filter((c) => c.id !== id)); setSelectedCustomer(null); }}
       />
+      {isOrderModalOpen && (
+        <ManualOrderModal
+          isOpen={isOrderModalOpen}
+          onClose={() => { setIsOrderModalOpen(false); setOrderModalCustomer(null); }}
+          initialCustomer={orderModalCustomer}
+          onOrderCreated={() => { setIsOrderModalOpen(false); setOrderModalCustomer(null); }}
+        />
+      )}
     </div>
   );
 }

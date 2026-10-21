@@ -83,7 +83,7 @@ export function OrderSummaryCard({
 
         <div className="flex justify-between items-center text-slate-600">
           <span>
-            Doorstep Delivery{" "}
+            Doorstep Delivery{distance_miles > 0 ? ` (~${distance_miles} mi)` : ""}{" "}
             {isFreeDelivery && (
               <span className="text-[10px] font-bold text-emerald-700 ml-1">FREE</span>
             )}

@@ -69,16 +69,53 @@ export class CardOnFileService {
    */
   static async chargeCardOnFile(
     orderId: string,
-    customAmount?: number
+    customAmount?: number,
+    newTotalAmount?: number
   ): Promise<{ success: boolean; order?: Order; totalAmount?: number; error?: string }> {
     if (!stripe) return { success: false, error: "Stripe is not configured." };
     const order = await OrderService.getOrderByNumber(orderId);
     if (!order) return { success: false, error: "Order not found." };
 
-    if (!order.stripe_customer_id || !order.stripe_payment_method_id) {
+    let customerId = order.stripe_customer_id;
+    let paymentMethodId = order.stripe_payment_method_id;
+
+    if (!customerId || !paymentMethodId) {
+      const supabase = createAdminSupabaseClient();
+      if (order.customer_email || order.user_id) {
+        const query = supabase.from("orders").select("stripe_customer_id, stripe_payment_method_id, card_brand, card_last4").not("stripe_payment_method_id", "is", null);
+        const { data: prev } = order.user_id
+          ? await query.eq("user_id", order.user_id).order("created_at", { ascending: false }).limit(1).maybeSingle()
+          : await query.eq("customer_email", order.customer_email).order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+        if (prev?.stripe_customer_id && prev?.stripe_payment_method_id) {
+          customerId = prev.stripe_customer_id;
+          paymentMethodId = prev.stripe_payment_method_id;
+          await supabase.from("orders").update({
+            stripe_customer_id: customerId, stripe_payment_method_id: paymentMethodId,
+            card_brand: prev.card_brand, card_last4: prev.card_last4,
+          }).eq("id", order.id);
+        }
+      }
+
+      if (customerId && !paymentMethodId) {
+        try {
+          const pms = await stripe.paymentMethods.list({ customer: customerId, type: "card", limit: 1 });
+          if (pms.data.length > 0) {
+            paymentMethodId = pms.data[0].id;
+            await supabase.from("orders").update({
+              stripe_payment_method_id: paymentMethodId,
+              card_brand: pms.data[0].card?.brand || "card",
+              card_last4: pms.data[0].card?.last4 || "",
+            }).eq("id", order.id);
+          }
+        } catch {}
+      }
+    }
+
+    if (!customerId || !paymentMethodId) {
       return {
         success: false,
-        error: "No card on file found for this customer. Please send them a card setup link first.",
+        error: "No reusable card on file found for this customer. Please send them a card setup link or payment checkout link.",
       };
     }
 
@@ -97,8 +134,8 @@ export class CardOnFileService {
       const intent = await stripe.paymentIntents.create({
         amount: amountCents,
         currency: "usd",
-        customer: order.stripe_customer_id,
-        payment_method: order.stripe_payment_method_id,
+        customer: customerId,
+        payment_method: paymentMethodId,
         off_session: true,
         confirm: true,
         description: `Laundry Express Order #${order.order_number} (Card on File Charge)`,
@@ -113,12 +150,18 @@ export class CardOnFileService {
       return { success: false, error: `Stripe card charge failed: ${msg}` };
     }
 
+    const finalTotal = typeof newTotalAmount === "number" && newTotalAmount > 0
+      ? newTotalAmount
+      : typeof customAmount === "number" && customAmount > 0
+      ? Math.max(order.total_amount, customAmount)
+      : order.total_amount;
+
     // Update order status to paid
     const supabase = createAdminSupabaseClient();
     const { data: updated, error: updateErr } = await supabase
       .from("orders")
       .update({
-        total_amount: amountToCharge,
+        total_amount: finalTotal,
         payment_status: "paid",
         stripe_payment_intent_id: paymentIntentId,
         updated_at: new Date().toISOString(),

@@ -12,12 +12,14 @@ import type { AdditionalItem, Order, PricingConfig } from "@/types";
 import { ManualOrderStep1 } from "./manual-order-step1";
 import { ManualOrderStep2 } from "./manual-order-step2";
 import { ManualOrderStep3 } from "./manual-order-step3";
+import { calculateDeliveryRadius } from "@/lib/services/geo-radius-service";
 import type { ManualOrderFormState, ManualOrderFieldChange } from "./manual-order-types";
 
 interface ManualOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOrderCreated: (order: Order) => void;
+  initialCustomer?: Partial<ManualOrderFormState> | null;
 }
 
 const getTomorrowDate = () => {
@@ -45,8 +47,8 @@ const INITIAL_FORM: ManualOrderFormState = {
   delivery_date: "",
   delivery_slot: "1pm-6pm",
   payment_method: "card",
-  payment_status: "paid",
-  order_status: "confirmed",
+  payment_status: "pending",
+  order_status: "pending",
   is_out_of_home: false,
   special_instructions: "",
   tip_amount: 0,
@@ -59,17 +61,26 @@ const STEPS = [
   { num: 3, label: "Payment & Confirm" },
 ] as const;
 
-export function ManualOrderModal({ isOpen, onClose, onOrderCreated }: ManualOrderModalProps) {
+export function ManualOrderModal({ isOpen, onClose, onOrderCreated, initialCustomer }: ManualOrderModalProps) {
   const [step, setStep] = React.useState<1 | 2 | 3>(1);
   const [form, setForm] = React.useState<ManualOrderFormState>(INITIAL_FORM);
   const [detergents, setDetergents] = React.useState<DetergentItem[]>([]);
   const [packages, setPackages] = React.useState<PackagePlan[]>([]);
   const [addItemsCatalog, setAddItemsCatalog] = React.useState<AdditionalItem[]>([]);
   const [pricing, setPricing] = React.useState<PricingConfig | null>(null);
-  const [deliveryZones, setDeliveryZones] = React.useState<{ city: string; zip: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState("");
   const [invoiceOrder, setInvoiceOrder] = React.useState<Order | null>(null);
+
+  React.useEffect(() => {
+    if (initialCustomer && isOpen) {
+      setForm((prev) => ({
+        ...prev,
+        ...initialCustomer,
+        detergent_id: prev.detergent_id || detergents[0]?.id || "",
+      }));
+    }
+  }, [initialCustomer, isOpen, detergents]);
 
   const resetForm = React.useCallback(() => {
     setForm({ ...INITIAL_FORM, detergent_id: detergents[0]?.id || "", pickup_date: getTomorrowDate() });
@@ -87,8 +98,7 @@ export function ManualOrderModal({ isOpen, onClose, onOrderCreated }: ManualOrde
       fetch("/api/pricing").then((r) => r.json()).catch(() => null),
       fetch("/api/plans").then((r) => r.json()).catch(() => null),
       fetch("/api/additional-items?all=true").then((r) => r.json()).catch(() => null),
-      fetch("/api/content?type=settings").then((r) => r.json()).catch(() => null),
-    ]).then(([catData, priceData, plansData, addItemsData, setData]) => {
+    ]).then(([catData, priceData, plansData, addItemsData]) => {
       if (catData?.success && Array.isArray(catData.detergents)) {
         setDetergents(catData.detergents);
         if (catData.detergents.length > 0) setForm((f) => ({ ...f, detergent_id: catData.detergents[0].id }));
@@ -96,11 +106,6 @@ export function ManualOrderModal({ isOpen, onClose, onOrderCreated }: ManualOrde
       if (priceData?.pricing) setPricing(priceData.pricing);
       if (plansData?.success && Array.isArray(plansData.plans)) setPackages(plansData.plans);
       if (addItemsData?.success && Array.isArray(addItemsData.items)) setAddItemsCatalog(addItemsData.items);
-      const rawZones = Array.isArray(setData?.settings?.delivery_zones) ? setData.settings.delivery_zones : [];
-      setDeliveryZones(rawZones.map((z: string) => {
-        const m = z.match(/^(.+?)\s*\(([0-9]{5})\)$/);
-        return m ? { city: m[1].trim(), zip: m[2] } : { city: z, zip: "" };
-      }));
     });
   }, [isOpen]);
 
@@ -116,17 +121,11 @@ export function ManualOrderModal({ isOpen, onClose, onOrderCreated }: ManualOrde
     } else {
       sub = form.pricing_mode === "per_bag" ? form.bag_count * 25 : form.estimated_weight_lbs * 1.75;
     }
-    let del = 0;
-    if (form.pricing_mode === "per_bag") {
-      const freeThreshold = pricing?.free_delivery_threshold ?? 2;
-      del = form.bag_count >= freeThreshold ? 0 : Number(pricing?.standard_delivery_fee ?? 0);
-    } else if (form.pricing_mode === "per_lb") {
-      const freeLbsThreshold = pricing?.free_delivery_lbs ?? 30;
-      del = form.estimated_weight_lbs >= freeLbsThreshold ? 0 : Number(pricing?.standard_delivery_fee ?? 0);
-    }
+    const geo = calculateDeliveryRadius(form.zip_code, form.city, pricing?.standard_delivery_fee);
+    const del = geo.deliveryFee;
     const tip = Number(form.tip_amount || 0);
     return { subtotal: sub, deliveryFee: del, totalAmount: Math.max(0, Math.round((sub + detergentFee + addItemsFee + del + tip) * 100) / 100) };
-  }, [pricing, form.pricing_mode, form.package_price, form.bag_count, form.estimated_weight_lbs, detergentFee, addItemsFee, form.tip_amount]);
+  }, [pricing, form.pricing_mode, form.package_price, form.bag_count, form.estimated_weight_lbs, detergentFee, addItemsFee, form.tip_amount, form.zip_code, form.city]);
 
   const handleFieldChange: ManualOrderFieldChange = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
 
@@ -135,6 +134,8 @@ export function ManualOrderModal({ isOpen, onClose, onOrderCreated }: ManualOrde
     if (step === 1) {
       if (!form.customer_name.trim() || !form.customer_phone.trim()) { setErrorMessage("Customer name and phone number are required."); return; }
       if (!form.street_address.trim() || !form.city.trim() || !form.zip_code.trim()) { setErrorMessage("Street address, city, and zip are required."); return; }
+      const geo = calculateDeliveryRadius(form.zip_code, form.city);
+      if (!geo.isServiceable) { setErrorMessage(geo.message || "Address is outside our 40-mile service radius."); return; }
       setStep(2);
     } else if (step === 2) {
       if (!form.pickup_date.trim()) { setErrorMessage("Pickup date is required."); return; }
@@ -178,7 +179,7 @@ export function ManualOrderModal({ isOpen, onClose, onOrderCreated }: ManualOrde
           )}
 
           <div className="space-y-4">
-            {step === 1 && <ManualOrderStep1 form={form} onChange={handleFieldChange} deliveryZones={deliveryZones} />}
+            {step === 1 && <ManualOrderStep1 form={form} onChange={handleFieldChange} />}
             {step === 2 && <ManualOrderStep2 form={form} onChange={handleFieldChange} detergents={detergents} packages={packages} additionalItems={addItemsCatalog} />}
             {step === 3 && (
               <ManualOrderStep3

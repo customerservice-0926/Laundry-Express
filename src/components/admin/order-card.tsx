@@ -115,15 +115,27 @@ export function OrderCard({
         className="flex flex-wrap items-center justify-end gap-1.5 pt-1"
         onClick={(e) => e.stopPropagation()}
       >
+        {order.order_status === "pending" && (
+          <Button
+            variant="hero"
+            size="sm"
+            className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 font-bold"
+            onClick={() => onUpdateStatus(order.id, "confirmed")}
+          >
+            <Check className="h-3.5 w-3.5 mr-1 shrink-0" />
+            Approve Order
+          </Button>
+        )}
+
         {order.order_status === "confirmed" && (
           <Button
             variant="hero"
             size="sm"
-            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
+            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 font-bold"
             onClick={() => onUpdateStatus(order.id, "driver_assigned")}
           >
             <Send className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Accept Order
+            Assign Driver
           </Button>
         )}
 

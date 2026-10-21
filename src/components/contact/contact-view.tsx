@@ -39,7 +39,7 @@ export function ContactView() {
           </div>
           <div>
             <span className="text-xs font-black text-slate-900 block">Service Coverage</span>
-            <span className="text-[11px] text-slate-500">{settings.deliveryZones.join(", ") || "Service areas configured by Laundry Express"}</span>
+            <span className="text-[11px] text-slate-500">40-mile radius across Northern Illinois (Free up to 30 mi, $10 for 30–40 mi)</span>
           </div>
         </div>
 

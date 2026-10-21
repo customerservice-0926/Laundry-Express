@@ -46,10 +46,11 @@ function SuccessContent() {
       if (!response.ok || !data?.success || !data.order) throw new Error(data?.error || "Unable to retrieve order.");
       setOrder(data.order);
       const isOrderPaid = data.order.payment_status === "paid";
-      const isOrderAuthorized = data.order.payment_status === "authorized" || (data.order.pricing_mode === "per_lb" && Boolean(data.order.stripe_payment_method_id));
+      const isOrderAuthorized = data.order.payment_status === "authorized" || Boolean(data.order.stripe_payment_method_id || data.order.card_last4);
+      const isSettled = isOrderPaid || isOrderAuthorized || data.order.payment_status === "failed" || data.order.order_status === "confirmed";
       setPaid(isOrderPaid || isOrderAuthorized);
       setStatusError("");
-      if (isOrderPaid || isOrderAuthorized || data.order.payment_status === "failed") {
+      if (isSettled) {
         setIsStatusChecked(true);
         return true;
       }
@@ -60,7 +61,9 @@ function SuccessContent() {
   }, [orderId, sessionId]);
 
   useOrdersRealtime({
+    enabled: !isStatusChecked && !paid,
     onEvent: (event) => {
+      if (isStatusChecked || paid) return;
       if (event.orderId === orderId || event.orderNumber === orderId || (order && order.id === event.orderId)) {
         void checkStatus();
       }
@@ -121,11 +124,11 @@ function SuccessContent() {
       <div className="space-y-2">
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Order #{order.order_number || orderId} Placed!</h1>
         <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-          {order.pricing_mode === "per_lb" && order.payment_status === "authorized"
-            ? "Card verified & saved! Your pickup is scheduled. We will measure your laundry on our scale upon arrival and charge the exact weight."
+          {Boolean(order.stripe_payment_method_id || order.card_last4)
+            ? "Card verified & saved on file! Your pickup is scheduled. We will inspect your laundry upon arrival and charge the service to your card on file."
             : paid
             ? "Payment confirmed. Your pickup is scheduled and our courier will arrive on time."
-            : "Order recorded. Awaiting payment confirmation."}
+            : "Order recorded. Awaiting confirmation."}
         </p>
       </div>
 

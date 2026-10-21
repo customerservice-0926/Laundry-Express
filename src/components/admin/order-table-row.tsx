@@ -111,19 +111,27 @@ export function OrderTableRow({
 
       <td className="p-3 lg:p-3.5 text-right space-x-1.5 whitespace-nowrap min-w-[170px]">
         {/* Step-by-Step Progressive Action Buttons */}
+        {order.order_status === "pending" && (
+          <Button
+            variant="hero"
+            size="sm"
+            className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 font-bold"
+            onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, "confirmed"); }}
+            title="Approve pending order"
+          >
+            <Check className="h-3.5 w-3.5 mr-1 shrink-0" /> Approve Order
+          </Button>
+        )}
+
         {order.order_status === "confirmed" && (
           <Button
             variant="hero"
             size="sm"
-            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateStatus(order.id, "driver_assigned");
-            }}
-            title="Accept order and dispatch confirmation email to customer"
+            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 font-bold"
+            onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, "driver_assigned"); }}
+            title="Assign driver to confirmed order"
           >
-            <Send className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Accept Order
+            <Send className="h-3.5 w-3.5 mr-1 shrink-0" /> Assign Driver
           </Button>
         )}
 

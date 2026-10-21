@@ -14,9 +14,17 @@ export default function CustomerRatingsPage() {
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = React.useState(true);
   const [showForm, setShowForm] = React.useState(false);
+  const [defaultOrderId, setDefaultOrderId] = React.useState<string>("");
 
   React.useEffect(() => {
     let mounted = true;
+    const params = new URLSearchParams(window.location.search);
+    const orderParam = params.get("order_id");
+    if (orderParam) {
+      setDefaultOrderId(orderParam);
+      setShowForm(true);
+    }
+
     fetch("/api/reviews")
       .then((res) => res.json())
       .then((data) => {
@@ -98,6 +106,7 @@ export default function CustomerRatingsPage() {
           <ReviewSubmitForm
             orders={orders}
             reviewedOrderIds={reviewedOrderIds}
+            defaultOrderId={defaultOrderId}
             onReviewSubmitted={handleReviewSubmitted}
           />
         )}

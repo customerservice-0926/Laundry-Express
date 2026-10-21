@@ -45,7 +45,7 @@ export default function ContactPage() {
   ]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/60 overflow-x-clip pt-12 sm:pt-16">
+    <div className="min-h-screen flex flex-col bg-slate-50/60 overflow-x-clip pt-12 sm:pt-16 max-md:pb-20">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}

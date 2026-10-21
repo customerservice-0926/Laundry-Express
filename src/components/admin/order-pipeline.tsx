@@ -73,6 +73,10 @@ export function OrderPipeline({
       if (!await onUpdateStatus(orderId, "in_wash")) return;
       triggerAlert(`${ord?.order_number || ""} picked up (no photo). Moved to Wash & Dry.`);
     } else if (type === "dropoff") {
+      if (ord?.payment_status === "pending") {
+        triggerAlert(`Cannot complete ${ord?.order_number || "order"}: payment is still pending. Collect payment first.`);
+        return;
+      }
       if (!await onUpdateStatus(orderId, "completed")) return;
       triggerAlert(`${ord?.order_number || ""} marked delivered (no photo). Completed.`);
     } else {
@@ -87,6 +91,10 @@ export function OrderPipeline({
       if (!await onUpdateStatus(orderId, "in_wash")) return;
       triggerAlert(`Pickup photo saved for ${ord?.order_number || ""}! In Wash & Dry.`);
     } else if (type === "dropoff") {
+      if (ord?.payment_status === "pending") {
+        triggerAlert(`Photo saved for ${ord?.order_number || ""}. Order cannot be completed while payment is pending.`);
+        return;
+      }
       if (!await onUpdateStatus(orderId, "completed")) return;
       triggerAlert(`Delivery photo verified for ${ord?.order_number || ""}! Completed.`);
     } else if (type === "damage") {

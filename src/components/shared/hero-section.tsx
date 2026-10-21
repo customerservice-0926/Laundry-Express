@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { FloatingBubbles } from "./floating-bubbles";
 import { HeroMascot } from "./hero-mascot";
 import { OrderTrackingSummary } from "@/components/home/order-tracking-summary";
-import { useSettings } from "@/hooks/use-settings";
 
 /**
  * HeroSection Component
@@ -23,7 +22,6 @@ interface HeroSectionProps {
 
 export function HeroSection({ initialBagPrice }: HeroSectionProps) {
   const [bagPrice, setBagPrice] = React.useState<number | null>(() => initialBagPrice ?? null);
-  const { deliveryZones } = useSettings();
 
   React.useEffect(() => {
     fetch("/api/pricing")
@@ -50,13 +48,13 @@ export function HeroSection({ initialBagPrice }: HeroSectionProps) {
           {/* Left Hero Content (7 Cols) */}
           <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
             {/* Unified Top Animated Badge: Location Highlight + Free Delivery */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-primary-pale shadow-xs text-xs font-medium text-slate-800">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-primary-pale shadow-xs text-[11px] sm:text-xs font-medium text-slate-800 max-w-full">
               <span className="relative flex h-2.5 w-2.5 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
               </span>
-              <p className="font-bold text-slate-900">
-                {deliveryZones.length ? deliveryZones.join(", ") : "Local Service Coverage"} &bull; <span className="text-emerald-700 uppercase font-black">Doorstep Pickup &amp; Delivery</span>
+              <p className="font-bold text-slate-900 leading-snug text-left sm:text-center">
+                40-Mile Service Area &bull; Free Delivery Within 30 Miles &bull; <span className="text-emerald-700 uppercase font-black whitespace-nowrap">Doorstep Pickup &amp; Delivery</span>
               </p>
             </div>
 

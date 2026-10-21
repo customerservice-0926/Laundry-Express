@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ArrowRight, Loader2, FileText, Link as LinkIcon } from "lucide-react";
+import { CheckCircle2, ArrowRight, Loader2, FileText } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -130,23 +130,6 @@ export function OrderInvoiceModal({ invoice, onClose }: OrderInvoiceModalProps) 
 
         {/* Modal Action Buttons: ONLY Download and Track Order */}
         <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
-          {invoice.paymentMethod === "card" && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                if (typeof window !== "undefined") {
-                  await navigator.clipboard.writeText(`${window.location.origin}/order/pay/${orderNum}`);
-                  toast.success("Customer payment link copied to clipboard!");
-                }
-              }}
-              className="cursor-pointer gap-1.5 border-sky-300 text-sky-700 hover:bg-sky-50 font-bold text-xs"
-            >
-              <LinkIcon className="h-3.5 w-3.5" />
-              <span>Copy Payment Link</span>
-            </Button>
-          )}
 
           <Button
             type="button"

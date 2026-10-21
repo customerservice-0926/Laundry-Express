@@ -5,6 +5,7 @@ import { ArrowRight, ArrowLeft } from "lucide-react";
 import type { PricingMode, User, PricingConfig, OrderAdditionalItemSelection } from "@/types";
 import type { CouponItem } from "@/lib/services/coupon-service";
 import { calculateOrderPrice } from "@/lib/stripe/pricing-calc";
+import { calculateDeliveryRadius } from "@/lib/services/geo-radius-service";
 import { useDetergents } from "@/hooks/use-detergents";
 import { usePackagePlans } from "@/hooks/use-package-plans";
 import { WizardStepper } from "./wizard-stepper";
@@ -75,18 +76,22 @@ export function BookingWizard({
   const boundedWeightLbs = rates.minLbs > 0 && rates.maxLbs >= rates.minLbs ? Math.min(rates.maxLbs, Math.max(rates.minLbs, weightLbs)) : weightLbs;
   const pricingIsValid = rates.bagPrice > 0 && rates.poundPrice > 0 && rates.minBags > 0 && rates.maxBags >= rates.minBags && rates.minLbs > 0 && rates.maxLbs >= rates.minLbs;
 
+  const geoResult = React.useMemo(() => {
+    return calculateDeliveryRadius(addressDetails?.zip || "", addressDetails?.city || "", rates.deliveryFee);
+  }, [addressDetails?.zip, addressDetails?.city, rates.deliveryFee]);
+
   const priceResult = React.useMemo(() => {
     if (isConfigLoading || configError || !pricingIsValid) return null;
     return calculateOrderPrice({
       pricing_mode: pricingMode, bag_count: boundedBagCount, estimated_weight_lbs: boundedWeightLbs,
       detergent_id: selectedDetergentId, detergent_fee: selectedDetergent?.price || 0,
       additional_items: additionalItems, tip_amount: tipAmount,
+      distance_miles: geoResult.distanceMiles, standard_delivery_fee: rates.deliveryFee,
       promo: appliedCoupon, base_bag_price: rates.bagPrice, base_pound_price: rates.poundPrice,
       min_bags: rates.minBags, max_bags: rates.maxBags, min_lbs: rates.minLbs, max_lbs: rates.maxLbs,
-      one_bag_delivery_fee: rates.deliveryFee, free_delivery_threshold: rates.freeDeliveryBags, free_delivery_lbs: rates.freeDeliveryLbs,
       package: pricingMode === "package" && selectedPackage ? { price: selectedPackage.discounted_price, capacity: selectedPackage.capacity, unit_type: selectedPackage.unit_type } : undefined,
     });
-  }, [isConfigLoading, configError, pricingIsValid, pricingMode, boundedBagCount, boundedWeightLbs, selectedDetergentId, selectedDetergent?.price, additionalItems, tipAmount, appliedCoupon, rates, selectedPackage]);
+  }, [isConfigLoading, configError, pricingIsValid, pricingMode, boundedBagCount, boundedWeightLbs, selectedDetergentId, selectedDetergent?.price, additionalItems, tipAmount, geoResult.distanceMiles, appliedCoupon, rates, selectedPackage]);
 
   const handleApplyPromo = async () => {
     if (!priceResult || !promoCode.trim()) return;
@@ -123,22 +128,10 @@ export function BookingWizard({
 
   const isStep3Valid = isSlotValid && isDateValid && isDropoffValid && Boolean(selectedSlot) && !isSelectedSlotClosed;
 
-  const isZoneCovered = React.useMemo(() => {
-    if (!settings.deliveryZones || settings.deliveryZones.length === 0) return true;
-    const cleanZip = (addressDetails?.zip || "").trim();
-    const cleanCity = (addressDetails?.city || "").trim().toLowerCase();
-    return settings.deliveryZones.some((z) => {
-      const zZip = (z.zip || "").trim();
-      const zCity = (z.city || "").trim().toLowerCase();
-      if (zZip && cleanZip) return zZip === cleanZip;
-      return zCity === cleanCity;
-    });
-  }, [settings.deliveryZones, addressDetails?.zip, addressDetails?.city]);
-
   const isAddressValid = address.trim().length >= 5 &&
-    Boolean(addressDetails?.city.trim()) &&
-    /^\d{5}(-\d{4})?$/.test(addressDetails?.zip.trim() || "") &&
-    isZoneCovered;
+    Boolean(addressDetails?.city?.trim()) &&
+    /^\d{5}(-\d{4})?$/.test(addressDetails?.zip?.trim() || "") &&
+    geoResult.isServiceable;
 
   const isStep4Valid = Boolean(isAddressValid && phoneValue.trim().length >= 7 && (!isOutOfHome || bagConfirmed));
 
@@ -222,7 +215,7 @@ export function BookingWizard({
             )}
             {step === 4 && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <StepOutOfHome currentUser={currentUser} phone={phoneValue} onPhoneChange={(value) => setPhone(value)} isOutOfHome={isOutOfHome} onIsOutOfHomeChange={setIsOutOfHome} isAwayForDropoff={isAwayForDropoff} onIsAwayForDropoffChange={setIsAwayForDropoff} bagConfirmed={bagConfirmed} onBagConfirmedChange={setBagConfirmed} address={address} onAddressChange={setAddress} addressDetails={addressDetails} onAddressDetailsChange={setAddressDetails} notes={notes} onNotesChange={setNotes} deliveryZones={settings.deliveryZones} showValidationErrors={showStep4Errors} />
+                <StepOutOfHome currentUser={currentUser} phone={phoneValue} onPhoneChange={(value) => setPhone(value)} isOutOfHome={isOutOfHome} onIsOutOfHomeChange={setIsOutOfHome} isAwayForDropoff={isAwayForDropoff} onIsAwayForDropoffChange={setIsAwayForDropoff} bagConfirmed={bagConfirmed} onBagConfirmedChange={setBagConfirmed} address={address} onAddressChange={setAddress} addressDetails={addressDetails} onAddressDetailsChange={setAddressDetails} notes={notes} onNotesChange={setNotes} showValidationErrors={showStep4Errors} />
                 <div className="flex items-center justify-between pt-2">
                   <Button variant="outline" onClick={() => setStep(3)}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
                   <Button variant="hero" size="lg" onClick={() => { if (!isStep4Valid) { setShowStep4Errors(true); return; } setStep(5); }}>Review Order <ArrowRight className="h-4 w-4 ml-2" /></Button>

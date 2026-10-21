@@ -3,6 +3,7 @@
 import { Check, Plus, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserAddress } from "@/lib/services/address-service";
+import { calculateDeliveryRadius } from "@/lib/services/geo-radius-service";
 
 interface SavedAddressSelectorProps {
   savedAddresses: UserAddress[];
@@ -11,7 +12,6 @@ interface SavedAddressSelectorProps {
   isAddingNew: boolean;
   onStartAddNew: () => void;
   onEditAddress?: (addr: UserAddress) => void;
-  deliveryZones?: { city: string; zip: string }[];
 }
 
 export function SavedAddressSelector({
@@ -21,7 +21,6 @@ export function SavedAddressSelector({
   isAddingNew,
   onStartAddNew,
   onEditAddress,
-  deliveryZones = [],
 }: SavedAddressSelectorProps) {
   if (savedAddresses.length === 0 || isAddingNew) return null;
 
@@ -41,14 +40,8 @@ export function SavedAddressSelector({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {savedAddresses.map((addr) => {
           const isSelected = selectedSavedId === addr.id;
-          const cleanZip = (addr.zip_code || "").trim();
-          const cleanCity = (addr.city || "").trim().toLowerCase();
-          const isCovered = deliveryZones.length === 0 || deliveryZones.some((z) => {
-            const zCity = (z.city || "").trim().toLowerCase();
-            const zZip = (z.zip || "").trim();
-            if (zZip && cleanZip) return zZip === cleanZip;
-            return zCity === cleanCity;
-          });
+          const geo = calculateDeliveryRadius(addr.zip_code, addr.city);
+          const isCovered = geo.isServiceable;
 
           return (
             <div
@@ -81,10 +74,21 @@ export function SavedAddressSelector({
                   <div className="mt-1.5">
                     <span className={cn(
                       "text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1.5",
-                      isCovered ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                      !isCovered
+                        ? "bg-rose-50 text-rose-700 border border-rose-200"
+                        : geo.isExtendedArea
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                     )}>
-                      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", isCovered ? "bg-emerald-500" : "bg-rose-500")} />
-                      {isCovered ? "Serviceable Area" : "Outside Service Area"}
+                      <span className={cn(
+                        "h-1.5 w-1.5 rounded-full shrink-0",
+                        !isCovered ? "bg-rose-500" : geo.isExtendedArea ? "bg-amber-500" : "bg-emerald-500"
+                      )} />
+                      {!isCovered
+                        ? "Outside 40-Mile Area"
+                        : geo.isExtendedArea
+                        ? `$${geo.deliveryFee} Fee (~${geo.distanceMiles} mi)`
+                        : `Free Delivery (~${geo.distanceMiles} mi)`}
                     </span>
                   </div>
                 </div>
