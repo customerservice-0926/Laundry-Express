@@ -20,8 +20,6 @@ export function StepPricingMode({
   bagPrice,
   poundPrice,
   minLbs,
-  freeDeliveryBags,
-  freeDeliveryLbs,
   packageFromPrice,
 }: StepPricingModeProps) {
   const modes: Array<{
@@ -35,7 +33,7 @@ export function StepPricingMode({
     {
       id: "per_bag",
       title: "By the Bag (Most Popular)",
-      badge: `${freeDeliveryBags}+ Bags = Free Delivery`,
+      badge: "Free Delivery Always",
       description: "Fill our 13-gallon bag (about 2 loads). Doorstep pickup, returned in 24 hours.",
       priceLabel: `$${bagPrice.toFixed(2)} / bag`,
       icon: ShoppingBag,
@@ -43,7 +41,7 @@ export function StepPricingMode({
     {
       id: "per_lb",
       title: "By Weight (Per Pound / lb)",
-      badge: `${freeDeliveryLbs}+ lbs = Free Delivery`,
+      badge: "Free Delivery Always",
       description: "Pay purely by weighed volume. Weighed on precision scale at our facility.",
       priceLabel: `$${poundPrice.toFixed(2)} / lb (${minLbs} lbs min)`,
       icon: Scale,

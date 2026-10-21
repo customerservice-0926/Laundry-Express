@@ -1,5 +1,6 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { ContentService } from "@/lib/services/content-service";
+import { calculateDeliveryRadius } from "@/lib/services/geo-radius-service";
 
 export interface AvailabilityCheckInput {
   pickup_date: string;
@@ -59,26 +60,10 @@ export async function validateOrderAvailability(input: AvailabilityCheckInput): 
     return "Service settings are temporarily unavailable. Please try again in a moment.";
   }
 
-  // Enforce service zone coverage
-  if (!settings?.delivery_zones || settings.delivery_zones.length === 0) {
-    return "Delivery zone configuration is currently being updated. Please try again shortly.";
-  }
-
-  const inputZip = input.zip_code.trim();
-  const inputCity = input.city.trim().toLowerCase();
-
-  const isCovered = settings.delivery_zones.some((zoneStr) => {
-    const match = zoneStr.trim().match(/^(.+?)(?:\s*\(([0-9]{5})\))?$/);
-    if (!match) return false;
-    const zoneCity = match[1].trim().toLowerCase();
-    const zoneZip = match[2]?.trim();
-    return zoneZip
-      ? zoneZip === inputZip && zoneCity === inputCity
-      : zoneCity === inputCity || zoneCity === inputZip;
-  });
-
-  if (!isCovered) {
-    return `We do not currently service ${input.city} (${input.zip_code}). Please choose a supported delivery area.`;
+  // Enforce 40-mile service radius from Lake in the Hills hub
+  const geoResult = calculateDeliveryRadius(input.zip_code, input.city);
+  if (!geoResult.isServiceable) {
+    return geoResult.message || `We service up to a 40-mile radius from our facility. Location ${input.city} (${input.zip_code}) is outside our delivery area.`;
   }
 
   // 2. Pickup Date Normalization & Strict Format Validation

@@ -7,16 +7,19 @@ import { Button } from "@/components/ui/button";
 import { OrderInvoiceModal } from "@/components/booking/order-invoice-modal";
 import { orderToUnifiedInvoice } from "@/lib/invoice/invoice-utils";
 import type { DetergentItem } from "@/lib/services/catalog-service";
-import type { Order, PricingConfig } from "@/types";
+import type { PackagePlan } from "@/lib/services/pricing-plan-service";
+import type { AdditionalItem, Order, PricingConfig } from "@/types";
 import { ManualOrderStep1 } from "./manual-order-step1";
 import { ManualOrderStep2 } from "./manual-order-step2";
 import { ManualOrderStep3 } from "./manual-order-step3";
+import { calculateDeliveryRadius } from "@/lib/services/geo-radius-service";
 import type { ManualOrderFormState, ManualOrderFieldChange } from "./manual-order-types";
 
 interface ManualOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOrderCreated: (order: Order) => void;
+  initialCustomer?: Partial<ManualOrderFormState> | null;
 }
 
 const getTomorrowDate = () => {
@@ -31,21 +34,24 @@ const INITIAL_FORM: ManualOrderFormState = {
   customer_email: "",
   street_address: "",
   apt_unit: "",
-  city: "Dallas",
-  state: "TX",
-  zip_code: "75201",
+  city: "Lake in the Hills",
+  state: "IL",
+  zip_code: "60156",
   pricing_mode: "per_bag",
   bag_count: 1,
   estimated_weight_lbs: 15,
+  additional_items: [],
   detergent_id: "",
   pickup_date: getTomorrowDate(),
   pickup_slot: "8am-12pm",
   delivery_date: "",
-  payment_method: "cash",
-  payment_status: "paid",
-  order_status: "confirmed",
+  delivery_slot: "1pm-6pm",
+  payment_method: "card",
+  payment_status: "pending",
+  order_status: "pending",
   is_out_of_home: false,
   special_instructions: "",
+  tip_amount: 0,
   send_email_copy: true,
 };
 
@@ -55,86 +61,81 @@ const STEPS = [
   { num: 3, label: "Payment & Confirm" },
 ] as const;
 
-export function ManualOrderModal({ isOpen, onClose, onOrderCreated }: ManualOrderModalProps) {
+export function ManualOrderModal({ isOpen, onClose, onOrderCreated, initialCustomer }: ManualOrderModalProps) {
   const [step, setStep] = React.useState<1 | 2 | 3>(1);
   const [form, setForm] = React.useState<ManualOrderFormState>(INITIAL_FORM);
   const [detergents, setDetergents] = React.useState<DetergentItem[]>([]);
+  const [packages, setPackages] = React.useState<PackagePlan[]>([]);
+  const [addItemsCatalog, setAddItemsCatalog] = React.useState<AdditionalItem[]>([]);
   const [pricing, setPricing] = React.useState<PricingConfig | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState("");
   const [invoiceOrder, setInvoiceOrder] = React.useState<Order | null>(null);
 
+  React.useEffect(() => {
+    if (initialCustomer && isOpen) {
+      setForm((prev) => ({
+        ...prev,
+        ...initialCustomer,
+        detergent_id: prev.detergent_id || detergents[0]?.id || "",
+      }));
+    }
+  }, [initialCustomer, isOpen, detergents]);
+
   const resetForm = React.useCallback(() => {
-    setForm({
-      ...INITIAL_FORM,
-      detergent_id: detergents[0]?.id || "",
-      pickup_date: getTomorrowDate(),
-    });
-    setStep(1);
-    setErrorMessage("");
+    setForm({ ...INITIAL_FORM, detergent_id: detergents[0]?.id || "", pickup_date: getTomorrowDate() });
+    setStep(1); setErrorMessage("");
   }, [detergents]);
 
-  const handleModalClose = () => {
-    resetForm();
-    onClose();
-  };
+  const handleModalClose = () => { resetForm(); onClose(); };
 
   React.useEffect(() => {
     if (!isOpen) return;
-    setStep(1);
-    setErrorMessage("");
-    setForm({
-      ...INITIAL_FORM,
-      detergent_id: detergents[0]?.id || "",
-      pickup_date: getTomorrowDate(),
-    });
+    setStep(1); setErrorMessage("");
+    setForm({ ...INITIAL_FORM, detergent_id: detergents[0]?.id || "", pickup_date: getTomorrowDate() });
     void Promise.all([
       fetch("/api/catalog").then((r) => r.json()).catch(() => null),
       fetch("/api/pricing").then((r) => r.json()).catch(() => null),
-    ]).then(([catData, priceData]) => {
+      fetch("/api/plans").then((r) => r.json()).catch(() => null),
+      fetch("/api/additional-items?all=true").then((r) => r.json()).catch(() => null),
+    ]).then(([catData, priceData, plansData, addItemsData]) => {
       if (catData?.success && Array.isArray(catData.detergents)) {
         setDetergents(catData.detergents);
-        if (catData.detergents.length > 0) {
-          setForm((f) => ({ ...f, detergent_id: catData.detergents[0].id }));
-        }
+        if (catData.detergents.length > 0) setForm((f) => ({ ...f, detergent_id: catData.detergents[0].id }));
       }
       if (priceData?.pricing) setPricing(priceData.pricing);
+      if (plansData?.success && Array.isArray(plansData.plans)) setPackages(plansData.plans);
+      if (addItemsData?.success && Array.isArray(addItemsData.items)) setAddItemsCatalog(addItemsData.items);
     });
   }, [isOpen]);
 
   const selectedDetergent = detergents.find((d) => d.id === form.detergent_id);
   const detergentFee = Number(selectedDetergent?.price || 0);
+  const addItemsFee = React.useMemo(() => form.additional_items.reduce((acc, it) => acc + (it.price || 0) * it.quantity, 0), [form.additional_items]);
 
   const { subtotal, deliveryFee, totalAmount } = React.useMemo(() => {
-    let sub = 0, del = 0;
-    if (pricing) {
-      if (form.pricing_mode === "per_bag") {
-        sub = form.bag_count * pricing.bag_price;
-        del = form.bag_count >= pricing.free_delivery_threshold ? 0 : pricing.standard_delivery_fee;
-      } else {
-        sub = Math.round(form.estimated_weight_lbs * pricing.pound_price * 100) / 100;
-        del = form.estimated_weight_lbs >= pricing.free_delivery_lbs ? 0 : pricing.standard_delivery_fee;
-      }
+    let sub = 0;
+    if (form.pricing_mode === "package") sub = form.package_price || 0;
+    else if (pricing) {
+      sub = form.pricing_mode === "per_bag" ? form.bag_count * pricing.bag_price : Math.round(form.estimated_weight_lbs * pricing.pound_price * 100) / 100;
     } else {
       sub = form.pricing_mode === "per_bag" ? form.bag_count * 25 : form.estimated_weight_lbs * 1.75;
-      del = 4.99;
     }
-    return { subtotal: sub, deliveryFee: del, totalAmount: Math.max(0, Math.round((sub + detergentFee + del) * 100) / 100) };
-  }, [pricing, form.pricing_mode, form.bag_count, form.estimated_weight_lbs, detergentFee]);
+    const geo = calculateDeliveryRadius(form.zip_code, form.city, pricing?.standard_delivery_fee);
+    const del = geo.deliveryFee;
+    const tip = Number(form.tip_amount || 0);
+    return { subtotal: sub, deliveryFee: del, totalAmount: Math.max(0, Math.round((sub + detergentFee + addItemsFee + del + tip) * 100) / 100) };
+  }, [pricing, form.pricing_mode, form.package_price, form.bag_count, form.estimated_weight_lbs, detergentFee, addItemsFee, form.tip_amount, form.zip_code, form.city]);
 
-  const handleFieldChange: ManualOrderFieldChange = (key, val) => {
-    setForm((prev) => ({ ...prev, [key]: val }));
-  };
+  const handleFieldChange: ManualOrderFieldChange = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
 
   const handleNext = () => {
     setErrorMessage("");
     if (step === 1) {
-      if (!form.customer_name.trim() || !form.customer_phone.trim()) {
-        setErrorMessage("Customer name and phone number are required."); return;
-      }
-      if (!form.street_address.trim() || !form.city.trim() || !form.zip_code.trim()) {
-        setErrorMessage("Street address, city, and zip are required."); return;
-      }
+      if (!form.customer_name.trim() || !form.customer_phone.trim()) { setErrorMessage("Customer name and phone number are required."); return; }
+      if (!form.street_address.trim() || !form.city.trim() || !form.zip_code.trim()) { setErrorMessage("Street address, city, and zip are required."); return; }
+      const geo = calculateDeliveryRadius(form.zip_code, form.city);
+      if (!geo.isServiceable) { setErrorMessage(geo.message || "Address is outside our 40-mile service radius."); return; }
       setStep(2);
     } else if (step === 2) {
       if (!form.pickup_date.trim()) { setErrorMessage("Pickup date is required."); return; }
@@ -143,39 +144,22 @@ export function ManualOrderModal({ isOpen, onClose, onOrderCreated }: ManualOrde
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage("");
-    setIsSubmitting(true);
+    e.preventDefault(); setErrorMessage(""); setIsSubmitting(true);
     try {
-      const res = await fetch("/api/orders/manual", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
-      });
+      const res = await fetch("/api/orders/manual", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
       const data = await res.json();
       if (!res.ok || !data.success || !data.order) throw new Error(data.error || "Failed to create order.");
-      onOrderCreated(data.order);
-      setInvoiceOrder(data.order);
-      resetForm();
-      onClose();
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Error creating order.");
-    } finally {
-      setIsSubmitting(false);
-    }
+      onOrderCreated(data.order); setInvoiceOrder(data.order); resetForm(); onClose();
+    } catch (err) { setErrorMessage(err instanceof Error ? err.message : "Error creating order."); }
+    finally { setIsSubmitting(false); }
   };
 
   const invoiceData = React.useMemo(() => invoiceOrder ? orderToUnifiedInvoice(invoiceOrder) : null, [invoiceOrder]);
 
   return (
     <>
-      <Dialog
-        open={isOpen}
-        onOpenChange={handleModalClose}
-        size="lg"
-        title="Create Phone / Manual Order"
-        description="Step-by-step entry for phone-in orders. Logs data for admin analytics and provides official invoices."
-      >
+      <Dialog open={isOpen} onOpenChange={handleModalClose} size="lg" title="Create Phone / Manual Order" description="Step-by-step entry for phone-in orders. Logs data for admin analytics and provides official invoices.">
         <div className="space-y-4">
-          {/* Stepper Indicator */}
           <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-100 text-xs font-bold">
             {STEPS.map((s) => (
               <div key={s.num} className={`flex items-center gap-2 pb-1 border-b-2 transition ${step === s.num ? "border-primary text-primary" : step > s.num ? "border-emerald-500 text-emerald-600" : "border-slate-200 text-slate-400"}`}>
@@ -196,11 +180,11 @@ export function ManualOrderModal({ isOpen, onClose, onOrderCreated }: ManualOrde
 
           <div className="space-y-4">
             {step === 1 && <ManualOrderStep1 form={form} onChange={handleFieldChange} />}
-            {step === 2 && <ManualOrderStep2 form={form} onChange={handleFieldChange} detergents={detergents} />}
+            {step === 2 && <ManualOrderStep2 form={form} onChange={handleFieldChange} detergents={detergents} packages={packages} additionalItems={addItemsCatalog} />}
             {step === 3 && (
               <ManualOrderStep3
-                form={form} onChange={handleFieldChange} subtotal={subtotal}
-                deliveryFee={deliveryFee} detergentFee={detergentFee} totalAmount={totalAmount}
+                form={form} onChange={handleFieldChange} subtotal={subtotal} deliveryFee={deliveryFee}
+                detergentFee={detergentFee} additionalItemsFee={addItemsFee} totalAmount={totalAmount}
               />
             )}
 

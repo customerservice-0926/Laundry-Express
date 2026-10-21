@@ -91,6 +91,20 @@ CREATE TABLE IF NOT EXISTS public.catalog_items (
 
 CREATE INDEX IF NOT EXISTS idx_catalog_items_category ON public.catalog_items(category);
 
+-- 6b. ADDITIONAL ITEMS TABLE (Custom clothing, uniforms, shoe cleaning managed by Admin)
+CREATE TABLE IF NOT EXISTS public.additional_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'clothing',
+    price NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_additional_items_is_active ON public.additional_items(is_active);
+
 -- 7. COUPONS & OFFERS TABLE
 CREATE TABLE IF NOT EXISTS public.coupons (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -171,6 +185,12 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS zip_code TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(10,2) NOT NULL DEFAULT 0;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS coupon_code TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS coupon_usage_counted_at TIMESTAMPTZ;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS additional_items JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS additional_items_fee NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS tip_amount NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS distance_miles NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS distance_surcharge NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS card_setup_link TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_payment_intent_unique
     ON public.orders(stripe_payment_intent_id) WHERE stripe_payment_intent_id IS NOT NULL;
 ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_order_status_check;

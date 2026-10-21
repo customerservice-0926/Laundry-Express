@@ -9,7 +9,6 @@ export interface SlotSettings {
   slot2Start: string;
   slot2End: string;
   operatingHours: string;
-  deliveryZones: string[];
 }
 
 const EMPTY: SlotSettings = {
@@ -18,7 +17,6 @@ const EMPTY: SlotSettings = {
   slot2Start: "",
   slot2End: "",
   operatingHours: "",
-  deliveryZones: [],
 };
 
 export function useSettings(): SlotSettings {
@@ -45,7 +43,6 @@ export function useSettings(): SlotSettings {
           slot2Start,
           slot2End,
           operatingHours: s.operating_hours || (slot1Start && slot2End ? `${fmt12h(slot1Start)} – ${fmt12h(slot2End)}` : ""),
-          deliveryZones: Array.isArray(s.delivery_zones) ? s.delivery_zones : [],
         });
       })
       .catch(() => {

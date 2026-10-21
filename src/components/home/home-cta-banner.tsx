@@ -169,7 +169,7 @@ export function HomeCtaBanner() {
 
                 {/* Floating Orbiting Satellite Badge 1 (Top-Left) */}
                 <motion.div
-                  className="absolute -top-4 -left-6 z-20 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-slate-900 border border-primary/30 shadow-xl text-xs font-black backdrop-blur-md whitespace-nowrap"
+                  className="absolute -top-4 -left-2 sm:-left-6 z-20 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-slate-900 border border-primary/30 shadow-xl text-xs font-black backdrop-blur-md whitespace-nowrap"
                   animate={prefersReduced ? {} : { y: [4, -6, 4] }}
                   transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
                 >
@@ -179,7 +179,7 @@ export function HomeCtaBanner() {
 
                 {/* Floating Orbiting Satellite Badge 2 (Bottom-Right) */}
                 <motion.div
-                  className="absolute -bottom-3 -right-6 z-20 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-slate-900 border border-emerald-300 shadow-xl text-xs font-black backdrop-blur-md whitespace-nowrap"
+                  className="absolute -bottom-3 -right-2 sm:-right-6 z-20 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-slate-900 border border-emerald-300 shadow-xl text-xs font-black backdrop-blur-md whitespace-nowrap"
                   animate={prefersReduced ? {} : { y: [-5, 5, -5] }}
                   transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
                 >

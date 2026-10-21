@@ -3,7 +3,7 @@
 import { Clock, Camera, AlertTriangle, Check, Send, Scale } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
 import { ORDER_STATUSES } from "@/lib/constants";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getOrderPriceWithoutTip } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 interface OrderTableRowProps {
@@ -69,6 +69,12 @@ export function OrderTableRow({
               Damage Logged • Customer Notified
             </span>
           )}
+
+          {order.additional_items && order.additional_items.length > 0 && (
+            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 border border-purple-200 whitespace-nowrap" title={order.additional_items.map(i => `${i.name} (${i.quantity}x)`).join(", ")}>
+              +{order.additional_items.reduce((acc, i) => acc + (i.quantity || 1), 0)} Specialty Items
+            </span>
+          )}
         </div>
       </td>
 
@@ -97,8 +103,11 @@ export function OrderTableRow({
         </span>
       </td>
 
-      <td className="p-3 lg:p-3.5 font-bold text-slate-900 whitespace-nowrap">
-        {formatCurrency(order.total_amount)}
+      <td className="p-3 lg:p-3.5 whitespace-nowrap">
+        <span className="font-bold text-slate-900 block">{formatCurrency(getOrderPriceWithoutTip(order))}</span>
+        {Number(order.tip_amount || 0) > 0 && (
+          <span className="text-[10px] text-emerald-600 font-semibold block">+{formatCurrency(Number(order.tip_amount || 0))} tip</span>
+        )}
       </td>
 
       <td className="p-3 lg:p-3.5 whitespace-nowrap">
@@ -111,120 +120,73 @@ export function OrderTableRow({
 
       <td className="p-3 lg:p-3.5 text-right space-x-1.5 whitespace-nowrap min-w-[170px]">
         {/* Step-by-Step Progressive Action Buttons */}
+        {order.order_status === "pending" && (
+          <Button variant="hero" size="sm" className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 font-bold" onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, "confirmed"); }} title="Approve pending order">
+            <Check className="h-3.5 w-3.5 mr-1 shrink-0" /> Approve Order
+          </Button>
+        )}
+
         {order.order_status === "confirmed" && (
-          <Button
-            variant="hero"
-            size="sm"
-            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateStatus(order.id, "driver_assigned");
-            }}
-            title="Accept order and dispatch confirmation email to customer"
-          >
-            <Send className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Accept Order
+          <Button variant="hero" size="sm" className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, "driver_assigned"); }} title="Assign driver to confirmed order">
+            <Send className="h-3.5 w-3.5 mr-1 shrink-0" /> Assign Driver
           </Button>
         )}
 
         {order.order_status === "driver_assigned" && (
-          canWeighAndCharge && onWeighOrder ? (
-            <Button
-              variant="hero"
-              size="sm"
-              className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 font-bold"
-              onClick={(e) => {
-                e.stopPropagation();
-                onWeighOrder(order);
-              }}
-              title="Weigh clothes on scale and charge customer card upon pickup"
-            >
-              <Scale className="h-3.5 w-3.5 mr-1 shrink-0" />
-              Pickup &amp; Weigh
+          <div className="inline-flex items-center gap-1.5">
+            {canWeighAndCharge && onWeighOrder ? (
+              <Button variant="hero" size="sm" className="h-8 px-2.5 text-xs bg-amber-600 hover:bg-amber-700 font-bold" onClick={(e) => { e.stopPropagation(); onWeighOrder(order); }} title="Weigh on scale and charge card upon pickup">
+                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Pickup &amp; Weigh
+              </Button>
+            ) : (
+              <Button variant="primary" size="sm" className="h-8 px-2.5 text-xs" onClick={(e) => { e.stopPropagation(); onOpenProofModal(order, "pickup"); }} title="Upload pickup proof photo">
+                <Camera className="h-3.5 w-3.5 mr-1 shrink-0" /> Pickup Proof
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="h-8 px-2 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50" onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, "picked_up"); }} title="Mark order picked up">
+              Picked Up
             </Button>
-          ) : (
-            <Button
-              variant="primary"
-              size="sm"
-              className="h-8 px-3 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenProofModal(order, "pickup");
-              }}
-              title="Upload pickup proof photo to start wash cycle"
-            >
-              <Camera className="h-3.5 w-3.5 mr-1 shrink-0" />
-              Pickup (Photo Proof)
+          </div>
+        )}
+
+        {order.order_status === "picked_up" && (
+          <div className="inline-flex items-center gap-1.5">
+            {canWeighAndCharge && onWeighOrder && (
+              <Button variant="hero" size="sm" className="h-8 px-2.5 text-xs bg-amber-600 hover:bg-amber-700 font-bold" onClick={(e) => { e.stopPropagation(); onWeighOrder(order); }} title="Weigh clothes on scale and charge customer card">
+                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Weigh &amp; Charge
+              </Button>
+            )}
+            <Button variant={canWeighAndCharge ? "outline" : "hero"} size="sm" className={canWeighAndCharge ? "h-8 px-2 text-xs border-purple-300 text-purple-700 hover:bg-purple-50" : "h-8 px-3 text-xs bg-purple-600 hover:bg-purple-700 font-bold text-white"} onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, "in_wash"); }} title="Start washing order">
+              <Check className="h-3.5 w-3.5 mr-1 shrink-0" /> Start Wash
             </Button>
-          )
+          </div>
         )}
 
         {order.order_status === "in_wash" && (
           <div className="inline-flex items-center gap-1.5">
             {canWeighAndCharge && onWeighOrder && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onWeighOrder(order);
-                }}
-                title="Adjust scale weight or charge card"
-              >
-                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" />
-                Adjust Weight
+              <Button variant="outline" size="sm" className="h-8 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-50" onClick={(e) => { e.stopPropagation(); onWeighOrder(order); }} title="Adjust scale weight or charge card">
+                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Adjust Weight
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 text-xs border-rose-300 text-rose-700 hover:bg-rose-50"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenProofModal(order, "damage");
-              }}
-              title="Add photo of pre-existing garment tear or stain to notify customer"
-            >
-              <AlertTriangle className="h-3.5 w-3.5 mr-1 text-rose-600 shrink-0" />
-              Report Damage
+            <Button variant="outline" size="sm" className="h-8 px-2 text-xs border-rose-300 text-rose-700 hover:bg-rose-50" onClick={(e) => { e.stopPropagation(); onOpenProofModal(order, "damage"); }} title="Report garment tear or stain">
+              <AlertTriangle className="h-3.5 w-3.5 mr-1 text-rose-600 shrink-0" /> Damage
             </Button>
-
-            <Button
-              variant="hero"
-              size="sm"
-              className="h-8 px-2.5 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onUpdateStatus(order.id, "out_for_delivery");
-              }}
-              title="Mark order finished washing & ready for delivery"
-            >
+            <Button variant="hero" size="sm" className="h-8 px-2.5 text-xs" onClick={(e) => { e.stopPropagation(); onUpdateStatus(order.id, "out_for_delivery"); }} title="Mark finished washing & ready for delivery">
               Ready for Delivery
             </Button>
           </div>
         )}
 
         {order.order_status === "out_for_delivery" && (
-          <Button
-            variant="hero"
-            size="sm"
-            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenProofModal(order, "dropoff");
-            }}
-            title="Upload drop-off photo proof to complete order"
-          >
-            <Camera className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Deliver (Drop-off Photo)
+          <Button variant="hero" size="sm" className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={(e) => { e.stopPropagation(); onOpenProofModal(order, "dropoff"); }} title="Upload drop-off photo proof to complete order">
+            <Camera className="h-3.5 w-3.5 mr-1 shrink-0" /> Deliver (Photo Proof)
           </Button>
         )}
 
         {order.order_status === "completed" && (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <Check className="h-3 w-3 text-emerald-600 shrink-0" />
-            Completed
+            <Check className="h-3 w-3 text-emerald-600 shrink-0" /> Completed
           </span>
         )}
       </td>

@@ -2,14 +2,16 @@
 
 import * as React from "react";
 import { ArrowRight, ArrowLeft } from "lucide-react";
-import type { PricingMode, User, PricingConfig } from "@/types";
+import type { PricingMode, User, PricingConfig, OrderAdditionalItemSelection } from "@/types";
 import type { CouponItem } from "@/lib/services/coupon-service";
 import { calculateOrderPrice } from "@/lib/stripe/pricing-calc";
+import { calculateDeliveryRadius } from "@/lib/services/geo-radius-service";
 import { useDetergents } from "@/hooks/use-detergents";
 import { usePackagePlans } from "@/hooks/use-package-plans";
 import { WizardStepper } from "./wizard-stepper";
 import { StepPricingMode } from "./step-pricing-mode";
 import { StepBagCounter } from "./step-bag-counter";
+import { StepAdditionalItems } from "./step-additional-items";
 import { StepSlotPicker } from "./step-slot-picker";
 import { StepDetergent } from "./step-detergent";
 import { StepOutOfHome, type AddressDetails } from "./step-out-of-home";
@@ -25,6 +27,7 @@ export interface BookingWizardProps {
   initialBagCount?: number;
   initialWeightLbs?: number;
   initialPackageId?: string;
+  initialAddItem?: string;
   initialPricing?: Partial<PricingConfig>;
   currentUser?: User | null;
 }
@@ -32,7 +35,7 @@ export interface BookingWizardProps {
 const STEPS = ["Plan & Quantity", "Detergent", "Schedule", "Address", "Review", "Payment"];
 
 export function BookingWizard({
-  initialMode = "per_bag", initialBagCount = 2, initialWeightLbs, initialPackageId, initialPricing, currentUser = null,
+  initialMode = "per_bag", initialBagCount = 2, initialWeightLbs, initialPackageId, initialAddItem, initialPricing, currentUser = null,
 }: BookingWizardProps) {
   const [step, setStep] = React.useState(1);
   const [requestedMode, setPricingMode] = React.useState<PricingMode>(initialMode);
@@ -43,6 +46,8 @@ export function BookingWizard({
   const [bagCount, setBagCount] = React.useState(initialBagCount);
   const [weightLbs, setWeightLbs] = React.useState(() => Number(initialWeightLbs ?? initialPricing?.min_lbs ?? 0));
   const [selectedDetergentId, setSelectedDetergentId] = React.useState("");
+  const [additionalItems, setAdditionalItems] = React.useState<OrderAdditionalItemSelection[]>([]);
+  const [tipAmount, setTipAmount] = React.useState(0);
   const [showStep2Errors, setShowStep2Errors] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState(() => new Date().toISOString().split("T")[0]);
   const [dropoffDate, setDropoffDate] = React.useState("");
@@ -71,17 +76,22 @@ export function BookingWizard({
   const boundedWeightLbs = rates.minLbs > 0 && rates.maxLbs >= rates.minLbs ? Math.min(rates.maxLbs, Math.max(rates.minLbs, weightLbs)) : weightLbs;
   const pricingIsValid = rates.bagPrice > 0 && rates.poundPrice > 0 && rates.minBags > 0 && rates.maxBags >= rates.minBags && rates.minLbs > 0 && rates.maxLbs >= rates.minLbs;
 
+  const geoResult = React.useMemo(() => {
+    return calculateDeliveryRadius(addressDetails?.zip || "", addressDetails?.city || "", rates.deliveryFee);
+  }, [addressDetails?.zip, addressDetails?.city, rates.deliveryFee]);
+
   const priceResult = React.useMemo(() => {
     if (isConfigLoading || configError || !pricingIsValid) return null;
     return calculateOrderPrice({
       pricing_mode: pricingMode, bag_count: boundedBagCount, estimated_weight_lbs: boundedWeightLbs,
       detergent_id: selectedDetergentId, detergent_fee: selectedDetergent?.price || 0,
+      additional_items: additionalItems, tip_amount: tipAmount,
+      distance_miles: geoResult.distanceMiles, standard_delivery_fee: rates.deliveryFee,
       promo: appliedCoupon, base_bag_price: rates.bagPrice, base_pound_price: rates.poundPrice,
       min_bags: rates.minBags, max_bags: rates.maxBags, min_lbs: rates.minLbs, max_lbs: rates.maxLbs,
-      free_delivery_lbs: rates.freeDeliveryLbs, one_bag_delivery_fee: rates.deliveryFee, free_delivery_threshold: rates.freeDeliveryBags,
       package: pricingMode === "package" && selectedPackage ? { price: selectedPackage.discounted_price, capacity: selectedPackage.capacity, unit_type: selectedPackage.unit_type } : undefined,
     });
-  }, [isConfigLoading, configError, pricingIsValid, pricingMode, boundedBagCount, boundedWeightLbs, selectedDetergentId, selectedDetergent?.price, appliedCoupon, rates, selectedPackage]);
+  }, [isConfigLoading, configError, pricingIsValid, pricingMode, boundedBagCount, boundedWeightLbs, selectedDetergentId, selectedDetergent?.price, additionalItems, tipAmount, geoResult.distanceMiles, appliedCoupon, rates, selectedPackage]);
 
   const handleApplyPromo = async () => {
     if (!priceResult || !promoCode.trim()) return;
@@ -117,14 +127,19 @@ export function BookingWizard({
   );
 
   const isStep3Valid = isSlotValid && isDateValid && isDropoffValid && Boolean(selectedSlot) && !isSelectedSlotClosed;
-  const isAddressValid = address.trim().length >= 5 && Boolean(addressDetails?.city.trim()) && (addressDetails?.state.trim() || "IL") === "IL" && /^\d{5}(-\d{4})?$/.test(addressDetails?.zip.trim() || "");
+
+  const isAddressValid = address.trim().length >= 5 &&
+    Boolean(addressDetails?.city?.trim()) &&
+    /^\d{5}(-\d{4})?$/.test(addressDetails?.zip?.trim() || "") &&
+    geoResult.isServiceable;
+
   const isStep4Valid = Boolean(isAddressValid && phoneValue.trim().length >= 7 && (!isOutOfHome || bagConfirmed));
 
   const handleConfirm = () => {
     if (!priceResult) return;
     checkout({
       currentUser, pricingMode, packageId: selectedPackage?.id, bagCount: boundedBagCount, weightLbs: boundedWeightLbs, selectedDetergentId,
-      selectedDate, selectedSlot, dropoffDate, address, phone: phoneValue, addressDetails, isOutOfHome,
+      additionalItems, tipAmount, selectedDate, selectedSlot, dropoffDate, address, phone: phoneValue, addressDetails, isOutOfHome,
       isAwayForDropoff, bagConfirmed, notes, priceResult, paymentMethod, coupon: appliedCoupon,
     });
   };
@@ -145,6 +160,7 @@ export function BookingWizard({
               <div className="space-y-6 animate-in fade-in duration-200">
                 <StepPricingMode selectedMode={pricingMode} onSelectMode={setPricingMode} bagPrice={rates.bagPrice} poundPrice={rates.poundPrice} minLbs={rates.minLbs} freeDeliveryBags={rates.freeDeliveryBags} freeDeliveryLbs={rates.freeDeliveryLbs} packageFromPrice={packagePlans.length ? Math.min(...packagePlans.map((p) => p.discounted_price)) : undefined} />
                 <StepBagCounter pricingMode={pricingMode} bagCount={boundedBagCount} onBagCountChange={setBagCount} minBags={rates.minBags} maxBags={rates.maxBags} weightLbs={boundedWeightLbs} onWeightLbsChange={setWeightLbs} bagPrice={rates.bagPrice} freeDeliveryBags={rates.freeDeliveryBags} minLbs={rates.minLbs} maxLbs={rates.maxLbs} freeDeliveryLbs={rates.freeDeliveryLbs} packages={packagePlans} selectedPackageId={selectedPackage?.id} onSelectPackage={setPackageId} />
+                <StepAdditionalItems selectedItems={additionalItems} onItemsChange={setAdditionalItems} initialItemName={initialAddItem} />
                 <div className="flex justify-end pt-2">
                   <Button variant="hero" size="lg" disabled={!isStep1Valid} onClick={() => isStep1Valid && setStep(2)}>Continue to Detergent <ArrowRight className="h-4 w-4 ml-2" /></Button>
                 </div>
@@ -199,7 +215,7 @@ export function BookingWizard({
             )}
             {step === 4 && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <StepOutOfHome currentUser={currentUser} phone={phoneValue} onPhoneChange={(value) => setPhone(value)} isOutOfHome={isOutOfHome} onIsOutOfHomeChange={setIsOutOfHome} isAwayForDropoff={isAwayForDropoff} onIsAwayForDropoffChange={setIsAwayForDropoff} bagConfirmed={bagConfirmed} onBagConfirmedChange={setBagConfirmed} address={address} onAddressChange={setAddress} addressDetails={addressDetails} onAddressDetailsChange={setAddressDetails} notes={notes} onNotesChange={setNotes} deliveryZones={settings.deliveryZones} showValidationErrors={showStep4Errors} />
+                <StepOutOfHome currentUser={currentUser} phone={phoneValue} onPhoneChange={(value) => setPhone(value)} isOutOfHome={isOutOfHome} onIsOutOfHomeChange={setIsOutOfHome} isAwayForDropoff={isAwayForDropoff} onIsAwayForDropoffChange={setIsAwayForDropoff} bagConfirmed={bagConfirmed} onBagConfirmedChange={setBagConfirmed} address={address} onAddressChange={setAddress} addressDetails={addressDetails} onAddressDetailsChange={setAddressDetails} notes={notes} onNotesChange={setNotes} showValidationErrors={showStep4Errors} />
                 <div className="flex items-center justify-between pt-2">
                   <Button variant="outline" onClick={() => setStep(3)}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
                   <Button variant="hero" size="lg" onClick={() => { if (!isStep4Valid) { setShowStep4Errors(true); return; } setStep(5); }}>Review Order <ArrowRight className="h-4 w-4 ml-2" /></Button>
@@ -210,7 +226,7 @@ export function BookingWizard({
               <StepReview pricingMode={pricingMode} bagCount={boundedBagCount} weightLbs={boundedWeightLbs} packageName={selectedPackage?.name} packageCapacity={selectedPackage?.capacity} packageUnit={selectedPackage?.unit_type} selectedDetergentId={selectedDetergentId} selectedDate={selectedDate} selectedSlot={selectedSlot} address={address} phone={phoneValue} isOutOfHome={isOutOfHome} slot1Start={settings.slot1Start} slot1End={settings.slot1End} slot2Start={settings.slot2Start} slot2End={settings.slot2End} onEditStep={setStep} onBack={() => setStep(4)} onContinue={() => setStep(6)} />
             )}
             {step === 6 && (
-              <StepPayment pricingMode={pricingMode} priceResult={priceResult} promoCode={promoCode} onPromoCodeChange={setPromoCode} onApplyPromo={handleApplyPromo} promoError={promoError} paymentMethod={paymentMethod} onSelectPaymentMethod={setPaymentMethod} isProcessing={isProcessing} onConfirm={handleConfirm} onBack={() => setStep(5)} />
+              <StepPayment pricingMode={pricingMode} priceResult={priceResult} promoCode={promoCode} onPromoCodeChange={setPromoCode} onApplyPromo={handleApplyPromo} promoError={promoError} paymentMethod={paymentMethod} onSelectPaymentMethod={setPaymentMethod} tipAmount={tipAmount} onTipChange={setTipAmount} isProcessing={isProcessing} onConfirm={handleConfirm} onBack={() => setStep(5)} />
             )}
           </div>
           <div className="lg:col-span-1">

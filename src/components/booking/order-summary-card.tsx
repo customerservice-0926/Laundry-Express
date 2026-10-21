@@ -19,14 +19,30 @@ export function OrderSummaryCard({
   bagCount = 2,
   weightLbs = 15,
 }: OrderSummaryCardProps) {
-  const { subtotal, detergent_fee, delivery_fee, discount_amount, total_amount, breakdown } = priceResult;
-  const isFreeDelivery = delivery_fee === 0 && subtotal > 0;
+  const {
+    subtotal,
+    detergent_fee,
+    additional_items_fee,
+    additional_items,
+    delivery_fee,
+    distance_miles,
+    tip_amount,
+    discount_amount,
+    total_amount,
+    breakdown,
+  } = priceResult;
+
+  const isFreeDelivery = delivery_fee === 0;
+  const dueToday = delivery_fee + (tip_amount || 0);
+  const nextCharge = Math.max(0, subtotal + detergent_fee + additional_items_fee - discount_amount);
 
   const weightDisplay = React.useMemo(() => {
     if (pricingMode === "per_bag") return `${bagCount} Bag(s) · ${bagCount * 13} Gal (~${(bagCount * 15).toFixed(0)} lbs)`;
     if (pricingMode === "per_lb") return `${weightLbs.toFixed(0)} lbs Weighed Laundry`;
     return `${breakdown.unit_count} ${breakdown.unit_name} Package`;
   }, [pricingMode, bagCount, weightLbs, breakdown]);
+
+  const totalAdditionalItemsCount = (additional_items || []).reduce((acc, it) => acc + (it.quantity || 0), 0);
 
   return (
     <div className="bg-white rounded-2xl border-2 border-pink-100 shadow-md p-6 space-y-4 sticky top-24">
@@ -59,12 +75,26 @@ export function OrderSummaryCard({
             {detergent_fee === 0 ? "FREE (Included)" : `+${formatCurrency(detergent_fee)}`}
           </span>
         </div>
+
+        {additional_items_fee > 0 && (
+          <div className="flex justify-between items-center text-slate-600">
+            <span>Additional Items ({totalAdditionalItemsCount})</span>
+            <span className="font-semibold text-slate-900">+{formatCurrency(additional_items_fee)}</span>
+          </div>
+        )}
+
         <div className="flex justify-between items-center text-slate-600">
-          <span>Doorstep Delivery {isFreeDelivery && <span className="text-[10px] font-bold text-emerald-700 ml-1">FREE</span>}</span>
+          <span>
+            Doorstep Delivery{distance_miles > 0 ? ` (~${distance_miles} mi)` : ""}{" "}
+            {isFreeDelivery && (
+              <span className="text-[10px] font-bold text-emerald-700 ml-1">FREE</span>
+            )}
+          </span>
           <span className={isFreeDelivery ? "font-bold text-emerald-600" : "font-semibold text-slate-900"}>
             {isFreeDelivery ? "$0.00" : formatCurrency(delivery_fee)}
           </span>
         </div>
+
         {discount_amount > 0 && (
           <div className="flex justify-between text-emerald-600 font-medium">
             <span>Coupon Discount</span>
@@ -74,15 +104,49 @@ export function OrderSummaryCard({
       </div>
 
       <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-        <span className="text-xs text-slate-500 font-medium">Estimated Total</span>
+        <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Estimated Order Price</span>
         <span className="text-2xl font-black text-slate-900 tracking-tight">{formatCurrency(total_amount)}</span>
       </div>
-      {pricingMode === "per_lb" && (
-        <div className="p-2 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 font-semibold flex items-center justify-between">
-          <span>Due Today:</span>
-          <span className="font-extrabold text-amber-900">$0.00 (Card Authorized)</span>
+
+      {tip_amount > 0 && (
+        <div className="flex justify-between items-center text-xs text-emerald-700 bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-100 font-semibold">
+          <span>Driver Tip (Additional Gratuity)</span>
+          <span>+{formatCurrency(tip_amount)}</span>
         </div>
       )}
+
+      {/* 2-Phase Payment Transparency */}
+      <div className="p-3 rounded-xl bg-pink-50/70 border border-pink-200/80 space-y-2 text-xs">
+        <div>
+          <div className="flex justify-between items-center text-slate-700">
+            <span className="font-bold flex items-center gap-1.5 text-slate-800">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
+              1. Due Today (Checkout):
+            </span>
+            <span className="font-black text-emerald-700">
+              {dueToday > 0 ? formatCurrency(dueToday) : "$0.00"}
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-500 block pl-3.5">
+            {dueToday > 0 ? "Doorstep delivery fee & driver tip" : "Free delivery · Card verified on file"}
+          </span>
+        </div>
+
+        <div className="pt-1.5 border-t border-pink-100">
+          <div className="flex justify-between items-center text-slate-700">
+            <span className="font-bold flex items-center gap-1.5 text-slate-800">
+              <span className="h-2 w-2 rounded-full bg-primary inline-block" />
+              2. Next Charge (After Pickup):
+            </span>
+            <span className="font-black text-primary">
+              {formatCurrency(nextCharge)}
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-500 block pl-3.5">
+            {pricingMode === "per_lb" ? "Laundry wash based on scale weight" : "Laundry wash, fold & extras"}
+          </span>
+        </div>
+      </div>
 
       <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
         <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />

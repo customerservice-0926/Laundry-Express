@@ -26,6 +26,10 @@ export function createInvoicePdfDoc(invoice: UnifiedInvoiceInput, logoDataUri?: 
   const subtotal = Number(invoice.subtotal !== undefined ? invoice.subtotal : invoice.totalAmount || 0);
   const detFee = Number(invoice.detergentFee || 0);
   const deliveryFee = Number(invoice.deliveryFee || 0);
+  const addlFee = Number(invoice.additionalItemsFee || (invoice as unknown as { additional_items_fee?: number }).additional_items_fee || 0);
+  const tipAmount = Number(invoice.tipAmount || (invoice as unknown as { tip_amount?: number }).tip_amount || 0);
+  const rawItems = invoice.additionalItems || (invoice as unknown as { additional_items?: { name: string; price: number; quantity: number }[] }).additional_items;
+  const additionalItems = Array.isArray(rawItems) ? rawItems : [];
   const discountAmount = Number(invoice.discountAmount || 0);
   const totalAmount = Number(invoice.totalAmount || 0);
   const specialRequest = invoice.orderDetails?.specialRequest || invoice.specialRequest || "Contactless Delivery";
@@ -122,6 +126,9 @@ export function createInvoicePdfDoc(invoice: UnifiedInvoiceInput, logoDataUri?: 
   const serviceRows: [string, string][] = [
     ["Selected Plan", planName],
     ["Order Intake Quantity", quantity],
+    ...(additionalItems.length > 0
+      ? [["Specialty Add-ons", additionalItems.map(i => `${i.name} (${i.quantity}x)`).join(", ")]] as [string, string][]
+      : []),
     ["Formula & Care", `${detergent} • Cold Water Care (${detFee === 0 ? "Included Free" : formatCurrency(detFee)})`],
     ["Doorstep Protocol", specialRequest],
   ];
@@ -148,8 +155,10 @@ export function createInvoicePdfDoc(invoice: UnifiedInvoiceInput, logoDataUri?: 
 
   const financialRows: [string, string, string][] = [
     ["Service Subtotal", formatCurrency(subtotal), "#0f172a"],
+    ...(addlFee > 0 ? [["Specialty Items", `+${formatCurrency(addlFee)}`, "#0f172a"]] as [string, string, string][] : []),
     ["Detergent Formulation Fee", detFee === 0 ? "FREE (Included)" : formatCurrency(detFee), detFee === 0 ? "#047857" : "#0f172a"],
     ["Doorstep Logistics (Pickup & Return)", deliveryFee === 0 ? "FREE ($0.00)" : formatCurrency(deliveryFee), deliveryFee === 0 ? "#047857" : "#0f172a"],
+    ...(tipAmount > 0 ? [["Driver & Team Tip", `+${formatCurrency(tipAmount)}`, "#047857"]] as [string, string, string][] : []),
     ...(discountAmount > 0 ? [["Promotional Discount", `-${formatCurrency(discountAmount)}`, "#047857"]] as [string, string, string][] : []),
     ["Payment Method", String(invoice.paymentMethod || "Credit / Debit Card (Stripe)"), "#0f172a"],
     ["Stripe Transaction ID", txId, "#334155"],
@@ -170,9 +179,9 @@ export function createInvoicePdfDoc(invoice: UnifiedInvoiceInput, logoDataUri?: 
   pdf.setFillColor(253, 242, 248); pdf.setDrawColor(251, 207, 232);
   pdf.rect(margin, y, contentW, 11, "FD");
   pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.5); pdf.setTextColor(15, 23, 42);
-  pdf.text("TOTAL CLEARED & AUTHORIZED", margin + 4, y + 5);
+  pdf.text("TOTAL ORDER PRICE (EXCL. TIP)", margin + 4, y + 5);
   pdf.setFontSize(6.5); pdf.setFont("helvetica", "normal"); pdf.setTextColor(100, 116, 139);
-  pdf.text("Captured securely via Stripe TLS 1.3 gateway", margin + 4, y + 8.5);
+  pdf.text("Service, items & delivery fees", margin + 4, y + 8.5);
   pdf.setFontSize(13); pdf.setFont("helvetica", "bold"); pdf.setTextColor(190, 24, 93);
   pdf.text(formatCurrency(totalAmount), W - margin - 4, y + 7.5, { align: "right" });
   y += 15;

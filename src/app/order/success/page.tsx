@@ -9,6 +9,7 @@ import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
 import { orderToUnifiedInvoice } from "@/lib/invoice/invoice-utils";
 import { OrderInvoiceCard } from "@/components/booking/order-invoice-card";
+import { formatCurrency } from "@/lib/utils";
 import { useOrdersRealtime } from "@/hooks/use-orders-realtime";
 import type { Order } from "@/types";
 
@@ -46,10 +47,11 @@ function SuccessContent() {
       if (!response.ok || !data?.success || !data.order) throw new Error(data?.error || "Unable to retrieve order.");
       setOrder(data.order);
       const isOrderPaid = data.order.payment_status === "paid";
-      const isOrderAuthorized = data.order.payment_status === "authorized" || (data.order.pricing_mode === "per_lb" && Boolean(data.order.stripe_payment_method_id));
+      const isOrderAuthorized = data.order.payment_status === "authorized" || Boolean(data.order.stripe_payment_method_id || data.order.card_last4);
+      const isSettled = isOrderPaid || isOrderAuthorized || data.order.payment_status === "failed" || data.order.order_status === "confirmed";
       setPaid(isOrderPaid || isOrderAuthorized);
       setStatusError("");
-      if (isOrderPaid || isOrderAuthorized || data.order.payment_status === "failed") {
+      if (isSettled) {
         setIsStatusChecked(true);
         return true;
       }
@@ -60,7 +62,9 @@ function SuccessContent() {
   }, [orderId, sessionId]);
 
   useOrdersRealtime({
+    enabled: !isStatusChecked && !paid,
     onEvent: (event) => {
+      if (isStatusChecked || paid) return;
       if (event.orderId === orderId || event.orderNumber === orderId || (order && order.id === event.orderId)) {
         void checkStatus();
       }
@@ -121,13 +125,47 @@ function SuccessContent() {
       <div className="space-y-2">
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Order #{order.order_number || orderId} Placed!</h1>
         <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-          {order.pricing_mode === "per_lb" && order.payment_status === "authorized"
-            ? "Card verified & saved! Your pickup is scheduled. We will measure your laundry on our scale upon arrival and charge the exact weight."
+          {Boolean(order.stripe_payment_method_id || order.card_last4)
+            ? "Card verified & saved on file! Your pickup is scheduled. We will inspect your laundry upon arrival and charge the service to your card on file."
             : paid
             ? "Payment confirmed. Your pickup is scheduled and our courier will arrive on time."
-            : "Order recorded. Awaiting payment confirmation."}
+            : "Order recorded. Awaiting confirmation."}
         </p>
       </div>
+
+      {(() => {
+        const paidToday = Number(order.delivery_fee || 0) + Number(order.tip_amount || 0);
+        const nextCharge = Math.max(0, Number(order.total_amount || 0) - paidToday);
+        return (
+          <div className="max-w-xl mx-auto p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-left space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Payment Breakdown</span>
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                {paid ? "Stripe Verified & Saved" : "Confirmed"}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block">1. Paid Today via Stripe</span>
+                <span className="text-xl font-black text-slate-900 block">{paidToday > 0 ? formatCurrency(paidToday) : "$0.00"}</span>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  {paidToday > 0 ? "Doorstep delivery fee & driver tip" : "Free delivery · Card verified on file ($0.00)"}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-pink-50/60 border border-pink-200/80 space-y-1">
+                <span className="text-[10px] font-bold text-primary uppercase tracking-wide block">2. Next Charge (After Pickup)</span>
+                <span className="text-xl font-black text-primary block">{formatCurrency(nextCharge)}</span>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  {order.pricing_mode === "per_lb"
+                    ? "Laundry wash based on scale weight upon pickup"
+                    : "Laundry wash & fold charged to card on file once in custody"}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {invoiceData && (
         <div className="w-full text-left">

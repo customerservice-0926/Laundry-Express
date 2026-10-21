@@ -1,58 +1,51 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { OrderService } from "@/lib/services/order-service";
-import { OrderBillingService } from "@/lib/services/order-billing-service";
 import { PricingPlanService } from "@/lib/services/pricing-plan-service";
 import { CatalogService } from "@/lib/services/catalog-service";
 import { CouponService, type CouponItem } from "@/lib/services/coupon-service";
 import { calculateOrderPrice } from "@/lib/stripe/pricing-calc";
 import { getVerifiedUser } from "@/lib/auth-request";
 import { validateCheckoutPayload } from "@/lib/checkout-validation";
-import { syncUserOrderContact } from "@/lib/services/checkout-sync-service";
+import { syncUserOrderContact, syncStripeCheckoutSession } from "@/lib/services/checkout-sync-service";
 import { validateOrderAvailability } from "@/lib/services/booking-availability-service";
+import { calculateDeliveryRadius } from "@/lib/services/geo-radius-service";
 import { stripe } from "@/lib/stripe/stripe-server";
 
 export async function GET(req: NextRequest) {
   try {
-    const verified = await getVerifiedUser(req);
-    if (!verified?.user.id) return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
-    const { user } = verified;
     const orderNumber = req.nextUrl.searchParams.get("order_id");
     const sessionId = req.nextUrl.searchParams.get("session_id");
     if (!orderNumber) return NextResponse.json({ success: false, error: "Missing order identifier" }, { status: 400 });
 
     let order = await OrderService.getOrderByNumber(orderNumber);
     if (!order) return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
-    if (user.role !== "admin" && order.user_id !== user.id && order.customer_email?.toLowerCase() !== user.email.toLowerCase()) {
-      return NextResponse.json({ success: false, error: "Forbidden." }, { status: 403 });
-    }
 
-    if (order.pricing_mode === "per_lb" && (!order.stripe_payment_method_id || order.payment_status === "pending") && sessionId && stripe) {
+    const verified = await getVerifiedUser(req);
+    const isOwner = verified && (verified.user.role === "admin" || order.user_id === verified.user.id || order.customer_email?.toLowerCase() === verified.user.email.toLowerCase());
+
+    if (!isOwner) {
+      if (!sessionId || !stripe) {
+        return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+      }
       try {
-        const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["setup_intent"] });
-        if (session && session.mode === "setup") {
-          const setupIntent = session.setup_intent as Stripe.SetupIntent | null;
-          const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id || "";
-          const paymentMethodId = typeof setupIntent?.payment_method === "string" ? setupIntent.payment_method : setupIntent?.payment_method?.id || "";
-          if (customerId && paymentMethodId) {
-            const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
-            const cardBrand = pm.card?.brand || "card";
-            const cardLast4 = pm.card?.last4 || "";
-            const updated = await OrderBillingService.recordCardAuthorized(order.id, {
-              stripeCustomerId: customerId,
-              stripePaymentMethodId: paymentMethodId,
-              cardBrand,
-              cardLast4,
-            });
-            if (updated) order = updated;
-          }
-        }
-      } catch (err) {
-        console.error("[api/checkout GET] sync setup session error:", err);
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const matches = session && (session.metadata?.order_number === order.order_number || session.metadata?.order_id === order.id);
+        if (!matches) return NextResponse.json({ success: false, error: "Forbidden." }, { status: 403 });
+      } catch {
+        return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
       }
     }
 
-    const isPaidOrAuthorized = order.payment_status === "paid" || order.payment_status === "authorized" || (order.pricing_mode === "per_lb" && Boolean(order.stripe_payment_method_id));
+    const isAlreadySettled =
+      (order.payment_status === "paid" || order.payment_status === "authorized") &&
+      Boolean(order.stripe_payment_method_id || order.card_last4 || order.payment_method === "cash");
+
+    if (sessionId && !isAlreadySettled) {
+      order = await syncStripeCheckoutSession(order, sessionId);
+    }
+
+    const isPaidOrAuthorized = order.payment_status === "paid" || order.payment_status === "authorized" || Boolean(order.stripe_payment_method_id || order.card_last4);
     return NextResponse.json({ success: true, paid: isPaidOrAuthorized, order, customerName: order.customer_name, customerEmail: order.customer_email });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to retrieve order";
@@ -105,10 +98,13 @@ export async function POST(req: NextRequest) {
     if (!detergent?.is_active) return NextResponse.json({ success: false, error: "Choose an available detergent before checkout." }, { status: 400 });
     const detergentFee = detergent ? detergent.price : 0;
 
+    const geoResult = calculateDeliveryRadius(body.zip_code, body.city, pricing.standard_delivery_fee);
     const priceInput = {
       pricing_mode: body.pricing_mode, bag_count: body.bag_count, estimated_weight_lbs: body.estimated_weight_lbs, detergent_fee: detergentFee,
+      additional_items: body.additional_items, tip_amount: body.tip_amount,
+      distance_miles: geoResult.distanceMiles, standard_delivery_fee: pricing.standard_delivery_fee,
       base_bag_price: pricing.base_bag_price, base_pound_price: pricing.base_pound_price, min_bags: pricing.min_bags, max_bags: pricing.max_bags,
-      min_lbs: pricing.min_lbs, max_lbs: pricing.max_lbs, free_delivery_lbs: pricing.free_delivery_lbs, one_bag_delivery_fee: pricing.one_bag_delivery_fee, free_delivery_threshold: pricing.free_delivery_threshold,
+      min_lbs: pricing.min_lbs, max_lbs: pricing.max_lbs,
       package: pkg ? { price: pkg.discounted_price, capacity: pkg.capacity, unit_type: pkg.unit_type } : undefined,
     };
 
@@ -131,64 +127,67 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Checkout requires a secure site URL." }, { status: 503 });
     }
     const origin = originUrl.origin;
-    // Here need to update
     if (Math.round(serverPrice.total_amount * 100) < 0) return NextResponse.json({ success: false, error: "The order total is below Stripe's minimum payment amount." }, { status: 400 });
 
     const createdOrder = await OrderService.createOrder({
       ...body,
-      package_id: pkg?.id || null,
-      package_name: pkg?.name || null,
-      detergent_name: detergent.name,
-      user_id: user.id,
-      customer_name: user.full_name,
-      customer_email: user.email,
+      package_id: pkg?.id || null, package_name: pkg?.name || null, detergent_name: detergent.name,
+      user_id: user.id, customer_name: user.full_name, customer_email: user.email,
       customer_phone: body.customer_phone || user.phone || "",
-      subtotal: serverPrice.subtotal,
-      detergent_fee: serverPrice.detergent_fee,
-      delivery_fee: serverPrice.delivery_fee,
-      discount_amount: serverPrice.discount_amount,
-      coupon_code: validatedCoupon?.code || null,
-      tax_amount: serverPrice.tax_amount,
-      total_amount: serverPrice.total_amount,
-      payment_method: paymentMethod,
-      payment_status: "pending",
-      order_status: "pending",
+      subtotal: serverPrice.subtotal, detergent_fee: serverPrice.detergent_fee,
+      additional_items: serverPrice.additional_items, additional_items_fee: serverPrice.additional_items_fee,
+      tip_amount: serverPrice.tip_amount, distance_miles: serverPrice.distance_miles, distance_surcharge: serverPrice.distance_surcharge,
+      delivery_fee: serverPrice.delivery_fee, discount_amount: serverPrice.discount_amount,
+      coupon_code: validatedCoupon?.code || null, tax_amount: serverPrice.tax_amount,
+      total_amount: serverPrice.total_amount, payment_method: paymentMethod, payment_status: "pending", order_status: "pending",
     });
 
     await syncUserOrderContact(user, body);
 
-    const netServiceAmountCents = Math.round((serverPrice.subtotal + serverPrice.detergent_fee - serverPrice.discount_amount) * 100);
     const deliveryFeeCents = Math.round(serverPrice.delivery_fee * 100);
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
-      {
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: `Laundry Express — ${pkg ? pkg.name : createdOrder.pricing_mode === "per_bag" ? "By The Bag Wash & Fold" : "By The Pound (lb)"}`,
-            description: `${createdOrder.pricing_mode === "per_lb" || pkg?.unit_type === "lb" ? `${createdOrder.estimated_weight_lbs} lbs` : `${createdOrder.bag_count} Bag(s)`} • Cold Water Gentle Care • 24hr Return`,
-            images: [`${origin}/brand/logo-badge.jpeg`],
-          },
-          unit_amount: netServiceAmountCents,
-        },
-        quantity: 1,
-      },
-    ];
+    const tipCents = Math.round(serverPrice.tip_amount * 100);
+    const initialPayableCents = deliveryFeeCents + tipCents;
 
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
     if (deliveryFeeCents > 0) {
       lineItems.push({
-        price_data: { currency: "usd", product_data: { name: "Doorstep Pickup & Return Delivery", description: "Doorstep pickup and 24hr return delivery" }, unit_amount: deliveryFeeCents },
+        price_data: { currency: "usd", product_data: { name: "Delivery Fee", description: `Laundry Express Doorstep Delivery (${serverPrice.distance_miles > 0 ? `~${serverPrice.distance_miles} mi` : "Standard"})` }, unit_amount: deliveryFeeCents },
+        quantity: 1,
+      });
+    }
+    if (tipCents > 0) {
+      lineItems.push({
+        price_data: { currency: "usd", product_data: { name: "Driver & Crew Gratuity (Tip)", description: "Customer tip for prompt handling" }, unit_amount: tipCents },
         quantity: 1,
       });
     }
 
     let session: Stripe.Checkout.Session;
     try {
-      if (createdOrder.pricing_mode === "per_lb") {
-        const existingCustomers = await stripe.customers.list({ email: user.email, limit: 1 });
-        const stripeCustomer = existingCustomers.data[0] || await stripe.customers.create({
-          email: user.email, name: user.full_name || user.email, metadata: { user_id: user.id },
-        });
+      const existingCustomers = await stripe.customers.list({ email: user.email, limit: 1 });
+      const stripeCustomer = existingCustomers.data[0] || await stripe.customers.create({
+        email: user.email, name: user.full_name || user.email, metadata: { user_id: user.id },
+      });
 
+      if (initialPayableCents > 0) {
+        session = await stripe.checkout.sessions.create({
+          payment_method_types: ["card"],
+          line_items: lineItems,
+          mode: "payment",
+          customer: stripeCustomer.id,
+          customer_update: { address: "auto", name: "auto" },
+          success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}&order_id=${encodeURIComponent(createdOrder.order_number)}`,
+          cancel_url: `${origin}/order?canceled=true&order_id=${createdOrder.order_number}`,
+          metadata: {
+            order_id: createdOrder.id, order_number: createdOrder.order_number, user_id: createdOrder.user_id || "",
+            pickup_date: createdOrder.pickup_date || "", pickup_slot: createdOrder.pickup_slot || "", checkout_type: "initial_tip_delivery",
+          },
+          payment_intent_data: {
+            setup_future_usage: "off_session",
+            metadata: { order_number: createdOrder.order_number, order_id: createdOrder.id },
+          },
+        });
+      } else {
         session = await stripe.checkout.sessions.create({
           payment_method_types: ["card"],
           mode: "setup",
@@ -196,21 +195,9 @@ export async function POST(req: NextRequest) {
           success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}&order_id=${encodeURIComponent(createdOrder.order_number)}`,
           cancel_url: `${origin}/order?canceled=true&order_id=${createdOrder.order_number}`,
           metadata: {
-            order_id: createdOrder.id,
-            order_number: createdOrder.order_number,
-            user_id: createdOrder.user_id || "",
-            pickup_date: createdOrder.pickup_date || "",
-            pickup_slot: createdOrder.pickup_slot || "",
-            pricing_mode: "per_lb",
+            order_id: createdOrder.id, order_number: createdOrder.order_number, user_id: createdOrder.user_id || "",
+            pickup_date: createdOrder.pickup_date || "", pickup_slot: createdOrder.pickup_slot || "", checkout_type: "card_setup",
           },
-        });
-      } else {
-        session = await stripe.checkout.sessions.create({
-          payment_method_types: ["card"], line_items: lineItems, mode: "payment", customer_email: user.email,
-          success_url: `${origin}/order/success?session_id={CHECKOUT_SESSION_ID}&order_id=${encodeURIComponent(createdOrder.order_number)}`,
-          cancel_url: `${origin}/order?canceled=true&order_id=${createdOrder.order_number}`,
-          metadata: { order_id: createdOrder.id, order_number: createdOrder.order_number, user_id: createdOrder.user_id || "", pickup_date: createdOrder.pickup_date || "", pickup_slot: createdOrder.pickup_slot || "" },
-          payment_intent_data: { metadata: { order_number: createdOrder.order_number, order_id: createdOrder.id } },
         });
       }
     } catch (error) {

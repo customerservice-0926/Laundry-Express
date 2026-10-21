@@ -15,7 +15,9 @@ import { getAuthSecret } from "@/lib/auth-secret";
 export async function proxy(req: NextRequest) {
   const { pathname, search, searchParams } = req.nextUrl;
   const isAdminRoute = pathname.startsWith("/admin");
-  const isOrderRoute = pathname.startsWith("/order");
+  const isOrderPayRoute = pathname.startsWith("/order/pay");
+  const isOrderSuccessRoute = pathname.startsWith("/order/success");
+  const isOrderRoute = pathname.startsWith("/order") && !isOrderPayRoute && !isOrderSuccessRoute;
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isAuthRoute =
     pathname.startsWith("/login") ||
@@ -59,6 +61,8 @@ export async function proxy(req: NextRequest) {
         "customers",
         "packages",
         "detergents",
+        "additional-items",
+        "additional_items",
         "coupons",
         "reviews",
         "faqs",

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ReviewService } from "@/lib/services/review-service";
 import { getVerifiedUser } from "@/lib/auth-request";
+import { verifyReviewToken } from "@/lib/services/review-token-service";
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,19 +24,35 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const verified = await getVerifiedUser(req);
-    if (!verified) {
-      return NextResponse.json({ success: false, error: "Please sign in to leave a review." }, { status: 401 });
-    }
-
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== "object") {
       return NextResponse.json({ success: false, error: "A valid review payload is required." }, { status: 400 });
     }
+
+    const verified = await getVerifiedUser(req);
+    let isTokenVerified = false;
+    let userId = verified?.user.id;
+    let customerName = verified?.user.full_name;
+
+    if (!verified) {
+      const token = typeof body.token === "string" ? body.token.trim() : "";
+      const verifiedToken = verifyReviewToken(token);
+      if (!verifiedToken.valid) {
+        return NextResponse.json({ success: false, error: "Please sign in or use the secure review link from your email." }, { status: 401 });
+      }
+      isTokenVerified = true;
+      userId = verifiedToken.orderId ? `customer-${verifiedToken.orderId}` : undefined;
+      customerName = body.customerName || "Verified Customer";
+    }
+
     const result = await ReviewService.submitReview({
-      ...body,
-      userId: verified.user.id,
-      customerName: verified.user.full_name || "Customer",
+      orderId: String(body.orderId || ""),
+      userId,
+      customerName: customerName || "Customer",
+      rating: Number(body.rating),
+      comment: String(body.comment || ""),
+      photoUrls: Array.isArray(body.photoUrls) ? body.photoUrls : [],
+      isTokenVerified,
     });
 
     if (!result.success) {

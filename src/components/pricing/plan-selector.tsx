@@ -32,7 +32,7 @@ export function PlanSelector({ initialRates }: PlanSelectorProps) {
         <div
           role="tablist"
           aria-label="Pricing Categories"
-          className="inline-flex p-1.5 rounded-2xl bg-slate-100 border border-slate-200/80 shadow-inner max-w-md w-full"
+          className="inline-flex p-1.5 rounded-2xl bg-slate-100 border border-slate-200/80 shadow-inner max-w-lg w-full"
         >
           <button
             type="button"
@@ -45,8 +45,8 @@ export function PlanSelector({ initialRates }: PlanSelectorProps) {
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <ShoppingBag className="h-4 w-4" />
-            <span>By the Bag</span>
+            <ShoppingBag className="h-4 w-4 shrink-0" />
+            <span className="truncate">By the Bag</span>
           </button>
 
           <button
@@ -60,8 +60,8 @@ export function PlanSelector({ initialRates }: PlanSelectorProps) {
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <Scale className="h-4 w-4" />
-            <span>By the Pound</span>
+            <Scale className="h-4 w-4 shrink-0" />
+            <span className="truncate">By the Pound</span>
           </button>
 
           <button
@@ -75,8 +75,8 @@ export function PlanSelector({ initialRates }: PlanSelectorProps) {
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <Gift className="h-4 w-4" />
-            <span>Saver Bundles</span>
+            <Gift className="h-4 w-4 shrink-0" />
+            <span className="truncate">Saver Bundles</span>
           </button>
         </div>
       </div>

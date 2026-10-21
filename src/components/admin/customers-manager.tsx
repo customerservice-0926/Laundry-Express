@@ -6,32 +6,57 @@ import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CustomerCard } from "./customer-card";
 import { CustomerDetailModal, CustomerAccount } from "./customer-detail-modal";
+import { ManualOrderModal } from "./manual-order-modal";
+import type { ManualOrderFormState } from "./manual-order-types";
 
 interface CustomersManagerProps {
   customers: CustomerAccount[];
 }
 
 export function CustomersManager({ customers }: CustomersManagerProps) {
+  const [customerList, setCustomerList] = React.useState<CustomerAccount[]>(customers);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedCustomer, setSelectedCustomer] = React.useState<CustomerAccount | null>(null);
+  const [orderModalCustomer, setOrderModalCustomer] = React.useState<Partial<ManualOrderFormState> | null>(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    setCustomerList(customers);
+  }, [customers]);
+
+  const handleStartOrder = (cust: CustomerAccount) => {
+    const latestOrder = cust.orders?.[0];
+    const isPhoneDummy = cust.email.includes("@call.laundryexpress.local");
+    setOrderModalCustomer({
+      customer_name: cust.full_name,
+      customer_phone: cust.phone !== "—" ? cust.phone : "",
+      customer_email: isPhoneDummy ? "" : cust.email,
+      street_address: latestOrder?.street_address || (cust.address !== "—" ? cust.address.split(",")[0]?.trim() : "") || "",
+      apt_unit: latestOrder?.apt_unit || "",
+      city: latestOrder?.city || "Lake in the Hills",
+      state: latestOrder?.state || "IL",
+      zip_code: latestOrder?.zip_code || "60156",
+    });
+    setIsOrderModalOpen(true);
+  };
 
   const filteredCustomers = React.useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
-    if (!term) return customers;
-    return customers.filter(
+    if (!term) return customerList;
+    return customerList.filter(
       (c) =>
         c.full_name.toLowerCase().includes(term) ||
         c.email.toLowerCase().includes(term) ||
         c.phone.toLowerCase().includes(term) ||
         c.address.toLowerCase().includes(term)
     );
-  }, [customers, searchTerm]);
+  }, [customerList, searchTerm]);
 
-  const totalSpentAcrossAll = customers.reduce(
+  const totalSpentAcrossAll = customerList.reduce(
     (acc, c) => acc + c.orders.reduce((sum, o) => sum + o.total_amount, 0),
     0
   );
-  const repeatCount = customers.filter((c) => c.orders.length > 1).length;
+  const repeatCount = customerList.filter((c) => c.orders.length > 1).length;
 
   return (
     <div className="space-y-6">
@@ -165,15 +190,9 @@ export function CustomersManager({ customers }: CustomersManagerProps) {
                         {formatCurrency(custTotalSpent)}
                       </td>
 
-                      <td className="p-3.5 text-right whitespace-nowrap min-w-[120px]">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs text-slate-700 hover:text-primary"
-                          onClick={() => setSelectedCustomer(cust)}
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1 shrink-0" />
-                          View Profile
+                      <td className="p-3.5 text-right whitespace-nowrap">
+                        <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px] text-slate-700 hover:text-primary font-bold" onClick={() => setSelectedCustomer(cust)}>
+                          <Eye className="h-3.5 w-3.5 mr-1" /> Profile
                         </Button>
                       </td>
                     </tr>
@@ -193,21 +212,27 @@ export function CustomersManager({ customers }: CustomersManagerProps) {
           </div>
         ) : (
           filteredCustomers.map((cust) => (
-            <CustomerCard
-              key={cust.id}
-              customer={cust}
-              onSelectCustomer={(c) => setSelectedCustomer(c)}
-            />
+            <CustomerCard key={cust.id} customer={cust} onSelectCustomer={(c) => setSelectedCustomer(c)} />
           ))
         )}
       </div>
 
-      {/* Customer Full Detail & History Modal */}
       <CustomerDetailModal
         customer={selectedCustomer}
         isOpen={!!selectedCustomer}
         onClose={() => setSelectedCustomer(null)}
+        onCreateOrder={handleStartOrder}
+        onCustomerUpdated={(up) => { setCustomerList((prev) => prev.map((c) => (c.id === up.id ? up : c))); setSelectedCustomer(up); }}
+        onCustomerDeleted={(id) => { setCustomerList((prev) => prev.filter((c) => c.id !== id)); setSelectedCustomer(null); }}
       />
+      {isOrderModalOpen && (
+        <ManualOrderModal
+          isOpen={isOrderModalOpen}
+          onClose={() => { setIsOrderModalOpen(false); setOrderModalCustomer(null); }}
+          initialCustomer={orderModalCustomer}
+          onOrderCreated={() => { setIsOrderModalOpen(false); setOrderModalCustomer(null); }}
+        />
+      )}
     </div>
   );
 }

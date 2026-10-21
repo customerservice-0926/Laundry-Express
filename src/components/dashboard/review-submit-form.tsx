@@ -10,10 +10,11 @@ import type { Order, OrderReview } from "@/types";
 interface ReviewSubmitFormProps {
   orders?: Order[];
   reviewedOrderIds?: Set<string>;
+  defaultOrderId?: string;
   onReviewSubmitted: (newReview: OrderReview) => void;
 }
 
-export function ReviewSubmitForm({ orders = [], reviewedOrderIds: externalReviewedIds, onReviewSubmitted }: ReviewSubmitFormProps) {
+export function ReviewSubmitForm({ orders = [], reviewedOrderIds: externalReviewedIds, defaultOrderId, onReviewSubmitted }: ReviewSubmitFormProps) {
   const completedOrders = React.useMemo(() => orders.filter((o) => o.order_status === "completed"), [orders]);
 
   // Use parent-provided set if available (avoids duplicate API call)
@@ -32,12 +33,19 @@ export function ReviewSubmitForm({ orders = [], reviewedOrderIds: externalReview
   const [submitted, setSubmitted] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Auto-select first eligible order
+  // Auto-select eligible order or defaultOrderId
   React.useEffect(() => {
+    if (defaultOrderId) {
+      const matched = eligibleOrders.find((o) => o.id === defaultOrderId || o.order_number === defaultOrderId);
+      if (matched) {
+        setSelectedOrderId(matched.id);
+        return;
+      }
+    }
     if (eligibleOrders.length > 0 && !eligibleOrders.find((o) => o.id === selectedOrderId)) {
       setSelectedOrderId(eligibleOrders[0].id);
     }
-  }, [eligibleOrders, selectedOrderId]);
+  }, [eligibleOrders, selectedOrderId, defaultOrderId]);
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);

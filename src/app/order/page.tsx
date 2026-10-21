@@ -76,7 +76,7 @@ export default async function OrderPage() {
       {/* Sticky Global Navigation Navbar */}
       <Navbar />
 
-      <main className="flex-1 py-10 bg-slate-50/60">
+      <main className="flex-1 py-10 bg-slate-50/60 max-md:pb-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           {/* Header Title */}
           <div className="text-center sm:text-left">

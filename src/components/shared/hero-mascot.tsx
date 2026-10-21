@@ -104,7 +104,7 @@ export function HeroMascot() {
 
         {/* Clean Floating Bubble Hero Verified Badge */}
         <motion.div
-          className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-11/12 max-w-68.75 z-20 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-primary-pale shadow-xl flex items-center justify-between"
+          className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-11/12 max-w-[275px] z-20 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-primary-pale shadow-xl flex items-center justify-between"
           animate={prefersReduced ? {} : { y: [-2, 2, -2] }}
           transition={{
             duration: 3.6,

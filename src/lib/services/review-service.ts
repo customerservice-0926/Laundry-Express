@@ -63,16 +63,56 @@ export class ReviewService {
   }
 
   /**
+   * Fetches review for an order by order_id (uuid) or order_number.
+   */
+  static async getReviewByOrder(orderId: string): Promise<OrderReview | null> {
+    try {
+      const supabase = createAdminSupabaseClient();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+      let targetId = orderId;
+      if (!isUuid) {
+        const { data: o } = await supabase.from("orders").select("id").eq("order_number", orderId).maybeSingle();
+        if (!o) return null;
+        targetId = o.id;
+      }
+      const { data: r } = await supabase.from("reviews").select("*").eq("order_id", targetId).maybeSingle();
+      if (!r) return null;
+      const photoUrls = extractPhotoUrls(r.photos);
+      return {
+        id: r.id,
+        order_id: r.order_id,
+        user_id: r.user_id || "",
+        customer_name: r.customer_name || "Verified Customer",
+        rating: Number(r.rating || 5),
+        comment: r.comment || "",
+        status: r.status || "approved",
+        photo_urls: photoUrls,
+        photos: photoUrls.map((url, i) => ({
+          id: `${r.id}-${i}`,
+          review_id: r.id,
+          photo_url: url,
+          display_order: (Math.min(3, i + 1) as 1 | 2 | 3),
+          created_at: r.created_at,
+        })),
+        created_at: r.created_at,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Submits a customer review with up to 3 photos.
    * Enforces: order must be completed, one review per order per user.
    */
   static async submitReview(input: {
     orderId: string;
-    userId: string;
-    customerName: string;
+    userId?: string;
+    customerName?: string;
     rating: number;
     comment: string;
     photoUrls?: string[];
+    isTokenVerified?: boolean;
   }): Promise<{ success: boolean; review?: OrderReview; error?: string }> {
     if (!input.orderId || !input.comment?.trim() || !Number.isInteger(input.rating) ||
       input.rating < 1 || input.rating > 5 || input.comment.length > 2000) {
@@ -86,18 +126,18 @@ export class ReviewService {
       const { data: order, error: orderError } = isUuid
         ? await supabase
             .from("orders")
-            .select("id, order_number, order_status, user_id, customer_email")
+            .select("id, order_number, order_status, user_id, customer_email, customer_name")
             .eq("id", input.orderId)
             .maybeSingle()
         : await supabase
             .from("orders")
-            .select("id, order_number, order_status, user_id, customer_email")
+            .select("id, order_number, order_status, user_id, customer_email, customer_name")
             .eq("order_number", input.orderId)
             .maybeSingle();
 
       if (orderError) throw new Error(`Unable to verify order: ${orderError.message}`);
       if (!order) return { success: false, error: "Order not found." };
-      if (order.user_id && order.user_id !== input.userId) {
+      if (!input.isTokenVerified && order.user_id && input.userId && order.user_id !== input.userId) {
         return { success: false, error: "You can only review your own orders." };
       }
       if (order.order_status !== "completed") {
@@ -109,13 +149,12 @@ export class ReviewService {
         .from("reviews")
         .select("id")
         .eq("order_id", order.id)
-        .eq("user_id", input.userId)
         .maybeSingle();
 
       if (existingError) {
         throw new Error(`Unable to check existing review: ${existingError.message}`);
       }
-      if (existing) return { success: false, error: "You have already submitted a review for this order." };
+      if (existing) return { success: false, error: "A review has already been submitted for this order." };
 
       const photos = (input.photoUrls || []).slice(0, 3);
       if (photos.some((url) => typeof url !== "string" || !url.includes("review-photos") || url.length > 2048)) {
@@ -123,13 +162,15 @@ export class ReviewService {
       }
 
       const initialStatus: "approved" | "pending" = "approved"; // Automatically published for customer, admin can moderate/delete
+      const effectiveUserId = input.userId || order.user_id || `customer-${order.id}`;
+      const effectiveName = input.customerName || order.customer_name || "Verified Customer";
 
       const { data: revData, error } = await supabase
         .from("reviews")
         .insert({
           order_id: order.id,
-          user_id: input.userId,
-          customer_name: input.customerName || "Customer",
+          user_id: effectiveUserId,
+          customer_name: effectiveName,
           rating: Math.min(5, Math.max(1, input.rating)),
           comment: input.comment.trim(),
           photos,

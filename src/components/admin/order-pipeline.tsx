@@ -16,6 +16,8 @@ interface OrderPipelineProps {
   onUpdateStatus: (orderId: string, newStatus: OrderStatus, reason?: string, notes?: string) => Promise<boolean>;
   onUploadProof: (orderId: string, proofType: "pickup" | "dropoff" | "damage", imageUrl: string, notes?: string) => Promise<boolean>;
   onOpenManualOrder?: () => void;
+  onOrderUpdated?: (order: Order) => void;
+  onOrderDeleted?: (orderId: string) => void;
 }
 
 export function OrderPipeline({
@@ -23,6 +25,8 @@ export function OrderPipeline({
   onUpdateStatus,
   onUploadProof,
   onOpenManualOrder,
+  onOrderUpdated,
+  onOrderDeleted,
 }: OrderPipelineProps) {
   const [selectedOrder, setSelectedOrder] = React.useState<Order | null>(null);
   const [detailOrderId, setDetailOrderId] = React.useState<string | null>(null);
@@ -69,6 +73,10 @@ export function OrderPipeline({
       if (!await onUpdateStatus(orderId, "in_wash")) return;
       triggerAlert(`${ord?.order_number || ""} picked up (no photo). Moved to Wash & Dry.`);
     } else if (type === "dropoff") {
+      if (ord?.payment_status === "pending") {
+        triggerAlert(`Cannot complete ${ord?.order_number || "order"}: payment is still pending. Collect payment first.`);
+        return;
+      }
       if (!await onUpdateStatus(orderId, "completed")) return;
       triggerAlert(`${ord?.order_number || ""} marked delivered (no photo). Completed.`);
     } else {
@@ -83,6 +91,10 @@ export function OrderPipeline({
       if (!await onUpdateStatus(orderId, "in_wash")) return;
       triggerAlert(`Pickup photo saved for ${ord?.order_number || ""}! In Wash & Dry.`);
     } else if (type === "dropoff") {
+      if (ord?.payment_status === "pending") {
+        triggerAlert(`Photo saved for ${ord?.order_number || ""}. Order cannot be completed while payment is pending.`);
+        return;
+      }
       if (!await onUpdateStatus(orderId, "completed")) return;
       triggerAlert(`Delivery photo verified for ${ord?.order_number || ""}! Completed.`);
     } else if (type === "damage") {
@@ -215,25 +227,9 @@ export function OrderPipeline({
         ))}
       </div>
 
-      <OrderProofModal
-        order={selectedOrder}
-        proofType={proofType}
-        isOpen={proofModalOpen}
-        onClose={() => setProofModalOpen(false)}
-        onSaveProof={handleSaveProof}
-        onSkip={handleSkipProof}
-      />
-
-      <OrderWeighModal
-        order={weighOrder}
-        isOpen={!!weighOrder}
-        onClose={() => setWeighOrder(null)}
-        onSuccess={(updated) => {
-          triggerAlert(`Scale weight recorded for ${updated.order_number}! Customer charged.`);
-        }}
-      />
-
-      <OrderDetailModal order={detailOrder} isOpen={!!detailOrder} onClose={() => setDetailOrderId(null)} onUpdateStatus={handleStatusChangeWithNotification} onOpenProofModal={handleOpenProofModal} onWeighOrder={(o) => setWeighOrder(o)} allOrders={orders} />
+      <OrderProofModal order={selectedOrder} proofType={proofType} isOpen={proofModalOpen} onClose={() => setProofModalOpen(false)} onSaveProof={handleSaveProof} onSkip={handleSkipProof} />
+      <OrderWeighModal order={weighOrder} isOpen={!!weighOrder} onClose={() => setWeighOrder(null)} onSuccess={(u) => triggerAlert(`Scale weight recorded for ${u.order_number}! Customer charged.`)} />
+      <OrderDetailModal order={detailOrder} isOpen={!!detailOrder} onClose={() => setDetailOrderId(null)} onUpdateStatus={handleStatusChangeWithNotification} onOpenProofModal={handleOpenProofModal} onWeighOrder={(o) => setWeighOrder(o)} onOrderUpdated={onOrderUpdated} onOrderDeleted={onOrderDeleted} allOrders={orders} />
     </div>
   );
 }

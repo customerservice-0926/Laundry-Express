@@ -1,4 +1,4 @@
-import type { PricingMode } from "@/types";
+import type { PricingMode, OrderAdditionalItemSelection } from "@/types";
 
 export interface CalculatePriceInput {
   pricing_mode: PricingMode;
@@ -6,6 +6,10 @@ export interface CalculatePriceInput {
   estimated_weight_lbs?: number;
   detergent_id?: string;
   detergent_fee?: number;
+  additional_items?: OrderAdditionalItemSelection[];
+  tip_amount?: number;
+  distance_surcharge?: number;
+  distance_miles?: number;
   promo?: {
     code: string;
     discount_type: "percentage" | "fixed_amount" | "free_delivery";
@@ -17,9 +21,9 @@ export interface CalculatePriceInput {
   max_bags: number;
   min_lbs: number;
   max_lbs: number;
-  free_delivery_lbs: number;
-  one_bag_delivery_fee: number;
-  free_delivery_threshold: number;
+  standard_delivery_fee?: number;
+  one_bag_delivery_fee?: number;
+  free_delivery_threshold?: number;
   package?: { price: number; capacity: number; unit_type: "bag" | "lb" };
 }
 
@@ -27,7 +31,12 @@ export interface CalculatedPriceResult {
   pricing_mode: PricingMode;
   subtotal: number;
   detergent_fee: number;
+  additional_items_fee: number;
+  additional_items?: OrderAdditionalItemSelection[];
   delivery_fee: number;
+  distance_miles: number;
+  distance_surcharge: number;
+  tip_amount: number;
   discount_amount: number;
   tax_amount: number;
   total_amount: number;
@@ -41,19 +50,19 @@ export interface CalculatedPriceResult {
 
 /**
  * Server-side zero-trust pricing engine.
- * Computes exact dollar and cent totals based on verified business rules and live admin rates.
+ * Computes exact dollar and cent totals based on verified business rules and live rates:
+ * - Free standard pickup & delivery ($0.00) within 30-mile radius
+ * - Extended distance surcharge for addresses > 30 miles
+ * - Additional specialty clothing/uniform items
+ * - Optional driver/service gratuity (tip)
  */
 export function calculateOrderPrice(input: CalculatePriceInput): CalculatedPriceResult {
   let subtotal = 0;
-  let deliveryFee = 0;
   let unitCount = 0;
   let unitName = "bags";
 
   const bagPrice = input.base_bag_price;
   const poundPrice = input.base_pound_price;
-  const stdDeliveryFee = input.one_bag_delivery_fee;
-  const freeBagThreshold = input.free_delivery_threshold;
-  const freePoundThreshold = input.free_delivery_lbs;
   const minLbs = input.min_lbs;
 
   let unitRate: number = bagPrice;
@@ -67,8 +76,6 @@ export function calculateOrderPrice(input: CalculatePriceInput): CalculatedPrice
     unitName = "bags";
     unitRate = bagPrice;
     subtotal = Math.round(unitCount * unitRate * 100) / 100;
-    // Free delivery rule for bags
-    deliveryFee = unitCount >= freeBagThreshold ? 0 : stdDeliveryFee;
   } else if (input.pricing_mode === "per_lb") {
     const rawWeight = Number(input.estimated_weight_lbs ?? minLbs);
     if (rawWeight < minLbs || rawWeight > input.max_lbs) {
@@ -78,9 +85,6 @@ export function calculateOrderPrice(input: CalculatePriceInput): CalculatedPrice
     unitName = "lbs";
     unitRate = poundPrice;
     subtotal = Math.round(unitCount * unitRate * 100) / 100;
-
-    // Free delivery rule: weight >= freePoundThreshold = FREE ($0.00), otherwise stdDeliveryFee
-    deliveryFee = unitCount >= freePoundThreshold ? 0 : stdDeliveryFee;
   } else if (input.pricing_mode === "package") {
     if (!input.package || input.package.price <= 0 || input.package.capacity <= 0) {
       throw new Error("Choose an available package.");
@@ -89,18 +93,37 @@ export function calculateOrderPrice(input: CalculatePriceInput): CalculatedPrice
     unitName = input.package.unit_type === "lb" ? "lbs" : "bags";
     unitRate = Math.round((input.package.price / unitCount) * 100) / 100;
     subtotal = Math.round(input.package.price * 100) / 100;
-    deliveryFee = 0;
   }
 
   // 2. Detergent add-on
   const detergentFee = Math.max(0, Number(input.detergent_fee || 0));
 
-  // 3. Promotional discounts
+  // 3. Additional clothing & specialty items (e.g. Football uniforms $20, Shoe cleaning $15)
+  const additionalItems = Array.isArray(input.additional_items) ? input.additional_items : [];
+  const additionalItemsFee = Math.max(
+    0,
+    Math.round(
+      additionalItems.reduce((acc, item) => acc + Math.max(0, Number(item.price || 0)) * Math.max(0, Number(item.quantity || 0)), 0) * 100
+    ) / 100
+  );
+
+  // 4. Distance-based delivery fee: Free within 30 miles; $10 (or standard_delivery_fee) for 30-40 miles
+  const distanceMiles = Math.max(0, Number(input.distance_miles || 0));
+  const extendedFee = Number(input.standard_delivery_fee ?? input.one_bag_delivery_fee ?? 10);
+  let deliveryFee = 0;
+  if (distanceMiles > 30 && distanceMiles <= 40) {
+    deliveryFee = extendedFee;
+  }
+
+  // 5. Driver / service tip
+  const tipAmount = Math.max(0, Math.round(Number(input.tip_amount || 0) * 100) / 100);
+
+  // 6. Promotional discounts
   let discountAmount = 0;
   let promoApplied: string | undefined;
 
   if (input.promo) {
-    const eligibleAmount = subtotal + detergentFee;
+    const eligibleAmount = subtotal + detergentFee + additionalItemsFee;
     if (input.promo.discount_type === "percentage") {
       discountAmount = Math.round(eligibleAmount * Math.min(100, input.promo.discount_value) / 100 * 100) / 100;
     } else if (input.promo.discount_type === "fixed_amount") {
@@ -111,15 +134,20 @@ export function calculateOrderPrice(input: CalculatePriceInput): CalculatedPrice
     promoApplied = input.promo.code;
   }
 
-  const taxableAmount = Math.max(0, subtotal + detergentFee + deliveryFee - discountAmount);
+  const orderPrice = Math.max(0, subtotal + detergentFee + additionalItemsFee + deliveryFee - discountAmount);
   const taxAmount = 0; // Tax-exempt or bundled in base rate
-  const totalAmount = Math.round(taxableAmount * 100) / 100;
+  const totalAmount = Math.round(orderPrice * 100) / 100;
 
   return {
     pricing_mode: input.pricing_mode,
     subtotal,
     detergent_fee: detergentFee,
+    additional_items_fee: additionalItemsFee,
+    additional_items: additionalItems,
     delivery_fee: deliveryFee,
+    distance_miles: distanceMiles,
+    distance_surcharge: deliveryFee,
+    tip_amount: tipAmount,
     discount_amount: discountAmount,
     tax_amount: taxAmount,
     total_amount: totalAmount,

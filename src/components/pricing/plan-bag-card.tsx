@@ -36,9 +36,8 @@ export function PlanBagCard({ bagCount, onBagCountChange, initialRates }: PlanBa
   }, []);
 
   const bagSubtotal = bagCount * rates.baseBagPrice;
-  const isFreeDelivery = bagCount >= rates.freeDeliveryThreshold;
-  const bagDeliveryFee = isFreeDelivery ? 0.0 : rates.deliveryFee;
-  const bagTotal = bagSubtotal + bagDeliveryFee;
+  const isFreeDelivery = true;
+  const bagTotal = bagSubtotal;
 
   return (
     <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-pink-200 shadow-xl max-w-2xl mx-auto space-y-6 animate-in fade-in duration-200">
@@ -90,28 +89,14 @@ export function PlanBagCard({ bagCount, onBagCountChange, initialRates }: PlanBa
         </div>
 
         {/* Delivery Fee Status Callout */}
-        <div
-          className={`p-3.5 rounded-xl border flex items-center justify-between text-xs transition-colors ${
-            isFreeDelivery
-              ? "bg-emerald-50 border-emerald-200 text-emerald-900"
-              : "bg-amber-50 border-amber-200 text-amber-900"
-          }`}
-        >
+        <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 flex items-center justify-between text-xs transition-colors">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
             <span>
-              {isFreeDelivery ? (
-                <strong>Awesome! {rates.freeDeliveryThreshold}+ Bags qualify for 100% FREE delivery.</strong>
-              ) : (
-                <span>
-                  Add {rates.freeDeliveryThreshold - bagCount} more bag to get <strong>FREE delivery</strong> (save {formatCurrency(rates.deliveryFee)})!
-                </span>
-              )}
+              <strong>100% FREE Pickup &amp; Delivery Always ($0.00)!</strong> Doorstep pickup within 30 miles included.
             </span>
           </div>
-          <Badge variant={isFreeDelivery ? "success" : "warning"}>
-            {isFreeDelivery ? "FREE ($0.00)" : `${formatCurrency(rates.deliveryFee)} Fee`}
-          </Badge>
+          <Badge variant="success">FREE ($0.00)</Badge>
         </div>
       </div>
 

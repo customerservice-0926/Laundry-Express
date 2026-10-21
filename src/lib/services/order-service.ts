@@ -25,9 +25,7 @@ export class OrderService {
       ]);
       if (byId.error || byEmail.error) throw new Error(`Unable to load orders: ${byId.error?.message || byEmail.error?.message}`);
       const records = [...(byId.data || []), ...(byEmail.data || [])];
-      return Array.from(new Map(records.map((r) => [r.id, r])).values())
-        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
-        .map(mapOrderRecord);
+      return Array.from(new Map(records.map((r) => [r.id, r])).values()).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).map(mapOrderRecord);
     }
     if (userId) query = query.eq("user_id", userId);
     else if (userEmail) query = query.eq("customer_email", userEmail);
@@ -61,6 +59,12 @@ export class OrderService {
       street_address: payload.street_address || "", apt_unit: payload.apt_unit || "",
       city: payload.city || "", state: payload.state || "", zip_code: payload.zip_code || "",
     };
+    const addressWithMeta = {
+      ...address,
+      additional_items: payload.additional_items ?? [], additional_items_fee: payload.additional_items_fee ?? 0,
+      tip_amount: payload.tip_amount ?? 0, distance_miles: payload.distance_miles ?? 0,
+      distance_surcharge: payload.distance_surcharge ?? 0, card_setup_link: payload.card_setup_link ?? null,
+    };
     const orderNumber = `LX-${new Date().getFullYear()}-${randomBytes(8).toString("hex").toUpperCase()}`;
     const supabase = createAdminSupabaseClient();
     const orderData = {
@@ -72,13 +76,16 @@ export class OrderService {
       plan_type: payload.pricing_mode || "per_bag", bag_count: payload.bag_count ?? 1,
       package_id: payload.package_id || null, package_name: payload.package_name || null,
       estimated_weight_lbs: payload.estimated_weight_lbs ?? 0, weight_lbs: payload.estimated_weight_lbs ?? 0,
+      subtotal: payload.subtotal ?? 0, discount_amount: payload.discount_amount ?? 0,
       detergent_id: payload.detergent_id, detergent_name: payload.detergent_name || "",
       detergent_fee: payload.detergent_fee ?? 0, pickup_date: payload.pickup_date,
       pickup_time_slot: payload.pickup_slot, dropoff_date: payload.delivery_date || null,
-      pickup_address: address, ...address, is_home_for_pickup: !payload.is_out_of_home,
+      pickup_address: addressWithMeta, ...address, is_home_for_pickup: !payload.is_out_of_home,
       doorstep_confirmation: Boolean(payload.bag_outside_door_confirmed),
       special_instructions: payload.special_instructions || payload.customer_notes || "",
-      subtotal: payload.subtotal ?? 0, discount_amount: payload.discount_amount ?? 0,
+      additional_items: payload.additional_items ?? [], additional_items_fee: payload.additional_items_fee ?? 0,
+      tip_amount: payload.tip_amount ?? 0, distance_miles: payload.distance_miles ?? 0,
+      distance_surcharge: payload.distance_surcharge ?? 0, card_setup_link: payload.card_setup_link ?? null,
       coupon_code: payload.coupon_code || null, coupon_usage_counted_at: null,
       delivery_fee: payload.delivery_fee ?? 0, tax_amount: payload.tax_amount ?? 0,
       total_amount: payload.total_amount ?? 0, order_status: "pending", payment_status: "pending",
@@ -112,15 +119,12 @@ export class OrderService {
 
   static async saveCheckoutSessionId(orderId: string, sessionId: string): Promise<void> {
     const supabase = createAdminSupabaseClient();
-    const { data, error } = await supabase.from("orders")
-      .update({ stripe_checkout_session_id: sessionId, updated_at: new Date().toISOString() })
-      .eq("id", orderId).eq("payment_status", "pending").select("id").maybeSingle();
+    const { data, error } = await supabase.from("orders").update({ stripe_checkout_session_id: sessionId, updated_at: new Date().toISOString() }).eq("id", orderId).eq("payment_status", "pending").select("id").maybeSingle();
     if (error || !data) throw new Error(`Unable to store Stripe session: ${error?.message || "Order is not pending."}`);
   }
 
   static async getCheckoutSessionId(orderId: string): Promise<string | null> {
-    const { data, error } = await createAdminSupabaseClient().from("orders")
-      .select("stripe_checkout_session_id").eq("id", orderId).maybeSingle();
+    const { data, error } = await createAdminSupabaseClient().from("orders").select("stripe_checkout_session_id").eq("id", orderId).maybeSingle();
     if (error) throw new Error(`Unable to load Stripe checkout session: ${error.message}`);
     return data?.stripe_checkout_session_id || null;
   }
@@ -147,8 +151,7 @@ export class OrderService {
       if (current && current.order_status === "cancelled" && ["pending", "failed"].includes(current.payment_status || "")) {
         const { data: cancelledOrder, error: cancelledError } = await supabase.from("orders").update({
           payment_status: "paid", stripe_payment_intent_id: details?.stripe_payment_intent_id,
-          customer_name: details?.customer_name || current.customer_name,
-          customer_email: details?.customer_email || current.customer_email,
+          customer_name: details?.customer_name || current.customer_name, customer_email: details?.customer_email || current.customer_email,
           payment_method: details?.payment_method || "card", updated_at: new Date().toISOString(),
         }).eq("id", current.id).eq("order_status", "cancelled").in("payment_status", ["pending", "failed"]).select("id").maybeSingle();
         if (cancelledError) throw new Error(`Unable to record payment: ${cancelledError.message}`);
@@ -184,10 +187,7 @@ export class OrderService {
       .update({ invoice_email_sent_at: new Date().toISOString() })
       .eq("id", orderId).is("invoice_email_sent_at", null).select("id").maybeSingle();
     if (error) throw new Error(`Unable to record invoice delivery: ${error.message}`);
-    if (!data) {
-      const order = await this.getOrderByNumber(orderId);
-      if (!order?.invoice_email_sent_at) throw new Error("Unable to record invoice delivery.");
-    }
+    if (!data && !(await this.getOrderByNumber(orderId))?.invoice_email_sent_at) throw new Error("Unable to record invoice delivery.");
   }
 
   static async updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean> {
@@ -199,6 +199,9 @@ export class OrderService {
     }
     if (order.order_status === "pending" && status === "driver_assigned") {
       throw new Error("Orders must be confirmed by payment before dispatch.");
+    }
+    if (status === "completed" && (order.payment_status === "pending" || order.payment_status === "failed")) {
+      throw new Error("Cannot complete order while payment is pending. Please collect payment or record card transaction first.");
     }
     const supabase = createAdminSupabaseClient();
     const column = UUID_PATTERN.test(orderId) ? "id" : "order_number";
@@ -223,7 +226,7 @@ export class OrderService {
     const perPoundRate = order.pricing_mode === "per_lb" && order.estimated_weight_lbs ? order.subtotal / order.estimated_weight_lbs : pricing.pound_price;
     const subtotal = Math.round(weightLbs * perPoundRate * 100) / 100;
     const deliveryFee = weightLbs >= pricing.free_delivery_lbs ? 0 : pricing.standard_delivery_fee;
-    const total = Math.max(0, subtotal + Number((order as Order & { detergent_fee?: number }).detergent_fee || 0) + deliveryFee - order.discount_amount);
+    const total = Math.max(0, subtotal + Number((order as Order & { detergent_fee?: number }).detergent_fee || 0) + Number(order.additional_items_fee || 0) + deliveryFee - order.discount_amount);
     const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase.from("orders").update({ final_weight_lbs: weightLbs, subtotal, delivery_fee: deliveryFee, total_amount: total, updated_at: new Date().toISOString() }).eq("id", order.id).select("id").maybeSingle();
     if (error || !data) throw new Error(`Unable to update final weight: ${error?.message || "Order not found."}`);

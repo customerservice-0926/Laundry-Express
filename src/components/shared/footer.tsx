@@ -56,7 +56,7 @@ export function Footer() {
               Service Areas
             </h4>
             <p className="text-xs text-neutral-400 leading-relaxed">
-              {settings.deliveryZones.length ? settings.deliveryZones.join(", ") : "Service areas configured by Laundry Express"}
+              Serving a 40-mile radius across Northern Illinois &amp; Chicago Northwest suburbs. Free delivery within 30 miles; $10 flat delivery for 30–40 miles.
             </p>
             <div className="pt-1 space-y-1.5 text-xs">
               <a

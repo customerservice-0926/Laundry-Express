@@ -74,8 +74,6 @@ export function StepBagCounter({
   }
 
   if (pricingMode === "per_lb") {
-    const isFreePoundDelivery = currentLbs >= freeDeliveryLbs;
-
     return (
       <div className="space-y-4 p-5 rounded-2xl bg-white border border-slate-200">
         <div className="flex items-center justify-between">
@@ -101,16 +99,17 @@ export function StepBagCounter({
           </div>
         </div>
 
-        <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between ${
-          isFreePoundDelivery ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-200 text-slate-600"
-        }`}>
-          <span>
-            {isFreePoundDelivery
-              ? `🎉 Awesome! Orders ${freeDeliveryLbs}+ lbs qualify for 100% FREE delivery.`
-              : `Add ${freeDeliveryLbs - currentLbs} more lbs to unlock FREE delivery!`}
-          </span>
-          <span className="font-black">{isFreePoundDelivery ? "FREE ($0.00)" : "Std Fee"}</span>
-        </div>
+        {currentLbs >= freeDeliveryLbs ? (
+          <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-semibold flex items-center justify-between">
+            <span>🎉 Doorstep pickup &amp; delivery is 100% FREE for orders {freeDeliveryLbs}+ lbs!</span>
+            <span className="font-black text-emerald-700">FREE ($0.00)</span>
+          </div>
+        ) : (
+          <div className="p-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-800 text-xs font-medium flex items-center justify-between">
+            <span>💡 Add <strong>{(freeDeliveryLbs - currentLbs).toFixed(0)} more lbs</strong> to unlock FREE pickup &amp; delivery!</span>
+            <span className="font-bold text-sky-700">Free at {freeDeliveryLbs} lbs</span>
+          </div>
+        )}
 
         <p className="text-xs text-slate-500">
           ℹ️ Our driver will weigh your laundry on a calibrated digital scale at pickup to verify final intake weight.
@@ -159,37 +158,24 @@ export function StepBagCounter({
         </div>
       </div>
 
-      {/* Free Delivery Trigger Banner */}
-      <div
-        className={cn(
-          "p-3 rounded-xl border text-xs flex items-center justify-between transition-colors",
-          isFreeDelivery
-            ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-            : "bg-amber-50 border-amber-200 text-amber-800"
-        )}
-      >
+      {/* Free Delivery Banner */}
+      <div className={cn(
+        "p-3 rounded-xl border text-xs flex items-center justify-between",
+        isFreeDelivery ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-sky-200 bg-sky-50 text-sky-800"
+      )}>
         <div className="flex items-center gap-2 min-w-0">
-          <Zap className="h-4 w-4 text-emerald-600 fill-emerald-600 shrink-0" />
-          {isFreeDelivery ? (
-            <span className="leading-snug">
-              <strong>Free Delivery Qualified!</strong> Orders with {freeDeliveryBags}+ bags qualify for <strong>$0.00 delivery</strong>.
-            </span>
-          ) : (
-            <span className="leading-snug">
-              Standard delivery fee applies. Add {Math.max(1, freeDeliveryBags - bagCount)} more bag to unlock <strong>Free Delivery ($0.00)</strong>!
-            </span>
-          )}
+          <Zap className={cn("h-4 w-4 shrink-0", isFreeDelivery ? "text-emerald-600 fill-emerald-600" : "text-sky-600")} />
+          <span className="leading-snug">
+            {isFreeDelivery ? (
+              <><strong>100% Free Delivery!</strong> Orders with {freeDeliveryBags}+ bags qualify for <strong>$0.00</strong> pickup &amp; delivery.</>
+            ) : (
+              <>Add <strong>{freeDeliveryBags - bagCount} more bag{freeDeliveryBags - bagCount > 1 ? "s" : ""}</strong> to unlock free pickup &amp; delivery!</>
+            )}
+          </span>
         </div>
-
-        {!isFreeDelivery && (
-          <button
-            type="button"
-            onClick={() => onBagCountChange(freeDeliveryBags)}
-            className="text-xs font-bold text-sky-700 underline hover:text-sky-900 shrink-0 ml-2 whitespace-nowrap cursor-pointer"
-          >
-            + Add Bag
-          </button>
-        )}
+        <span className={cn("font-black shrink-0 ml-2", isFreeDelivery ? "text-emerald-700" : "text-sky-700")}>
+          {isFreeDelivery ? "FREE ($0.00)" : `Free at ${freeDeliveryBags} bags`}
+        </span>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { Check, Plus, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserAddress } from "@/lib/services/address-service";
+import { calculateDeliveryRadius } from "@/lib/services/geo-radius-service";
 
 interface SavedAddressSelectorProps {
   savedAddresses: UserAddress[];
@@ -39,20 +40,25 @@ export function SavedAddressSelector({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {savedAddresses.map((addr) => {
           const isSelected = selectedSavedId === addr.id;
+          const geo = calculateDeliveryRadius(addr.zip_code, addr.city);
+          const isCovered = geo.isServiceable;
+
           return (
             <div
               key={addr.id}
-              onClick={() => onSelectSavedAddress(addr)}
+              onClick={() => isCovered && onSelectSavedAddress(addr)}
               className={cn(
-                "p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between",
-                isSelected
-                  ? "border-primary bg-pink-50/40 ring-2 ring-primary/20 shadow-2xs"
-                  : "border-slate-200 bg-white hover:border-slate-300"
+                "p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between",
+                !isCovered
+                  ? "border-slate-200 bg-slate-50/80 opacity-60 cursor-not-allowed"
+                  : isSelected
+                  ? "border-primary bg-pink-50/40 ring-2 ring-primary/20 shadow-2xs cursor-pointer"
+                  : "border-slate-200 bg-white hover:border-slate-300 cursor-pointer"
               )}
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0 pr-2">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-bold text-xs text-slate-900">{addr.label || "Home"}</span>
                     {addr.is_default && (
                       <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
@@ -64,6 +70,27 @@ export function SavedAddressSelector({
                     {addr.street_address}{addr.apt_unit ? `, Apt ${addr.apt_unit}` : ""}
                   </p>
                   <p className="text-[11px] text-slate-500">{addr.city}, {addr.state} {addr.zip_code}</p>
+
+                  <div className="mt-1.5">
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1.5",
+                      !isCovered
+                        ? "bg-rose-50 text-rose-700 border border-rose-200"
+                        : geo.isExtendedArea
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    )}>
+                      <span className={cn(
+                        "h-1.5 w-1.5 rounded-full shrink-0",
+                        !isCovered ? "bg-rose-500" : geo.isExtendedArea ? "bg-amber-500" : "bg-emerald-500"
+                      )} />
+                      {!isCovered
+                        ? "Outside 40-Mile Area"
+                        : geo.isExtendedArea
+                        ? `$${geo.deliveryFee} Fee (~${geo.distanceMiles} mi)`
+                        : `Free Delivery (~${geo.distanceMiles} mi)`}
+                    </span>
+                  </div>
                 </div>
 
                 {isSelected ? (

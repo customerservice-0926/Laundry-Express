@@ -26,6 +26,10 @@ export function OrderInvoiceModal({ invoice, onClose }: OrderInvoiceModalProps) 
   const planLabel = invoice.orderDetails?.planName || invoice.planName || "Wash & Fold";
   const qtyLabel = invoice.orderDetails?.quantity || invoice.quantity || "1 Order";
   const detergentLabel = invoice.orderDetails?.detergent || invoice.detergent || "Detergent";
+  const addlFee = Number(invoice.additionalItemsFee || (invoice as unknown as { additional_items_fee?: number }).additional_items_fee || 0);
+  const tipAmount = Number(invoice.tipAmount || (invoice as unknown as { tip_amount?: number }).tip_amount || 0);
+  const rawAddl = invoice.additionalItems || (invoice as unknown as { additional_items?: { name: string; price: number; quantity: number }[] }).additional_items;
+  const additionalItems = Array.isArray(rawAddl) ? rawAddl : [];
 
   const handleTrackOrder = () => {
     onClose();
@@ -87,17 +91,34 @@ export function OrderInvoiceModal({ invoice, onClose }: OrderInvoiceModalProps) 
               <p className="font-bold text-slate-900">{invoice.pickupDate} ({invoice.pickupSlot})</p>
               <p className="text-slate-600 text-[11px] truncate">{qtyLabel} • {planLabel}</p>
               <p className="text-slate-500 text-[11px] truncate">{detergentLabel}</p>
+              {additionalItems.length > 0 && (
+                <p className="text-slate-700 text-[11px] font-semibold truncate">
+                  Specialty: {additionalItems.map((i) => `${i.name} (${i.quantity}x)`).join(", ")}
+                </p>
+              )}
             </div>
           </div>
 
           {/* Compact Settlement Breakdown Bar */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <span>Method: <strong className="text-slate-800 uppercase">{invoice.paymentMethod || "Cash"}</strong></span>
+          <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+              <span>Method: <strong className="text-slate-800 uppercase">{invoice.paymentMethod || "Card"}</strong></span>
               <span>•</span>
-              <span>Delivery: <strong className="text-slate-800">{invoice.deliveryFee === 0 ? "FREE" : formatCurrency(invoice.deliveryFee || 0)}</strong></span>
+              <span>Delivery: <strong className={invoice.deliveryFee === 0 ? "text-emerald-700" : "text-slate-800"}>{invoice.deliveryFee === 0 ? "FREE" : formatCurrency(invoice.deliveryFee || 0)}</strong></span>
+              {addlFee > 0 && (
+                <>
+                  <span>•</span>
+                  <span>Items: <strong className="text-slate-800">+{formatCurrency(addlFee)}</strong></span>
+                </>
+              )}
+              {tipAmount > 0 && (
+                <>
+                  <span>•</span>
+                  <span>Tip: <strong className="text-emerald-600">+{formatCurrency(tipAmount)}</strong></span>
+                </>
+              )}
             </div>
-            <div className="text-right">
+            <div className="text-right shrink-0">
               <span className="text-[10px] uppercase font-bold text-slate-400 block leading-tight">Total</span>
               <span className="text-base font-black text-primary leading-tight">
                 {formatCurrency(invoice.totalAmount)}
@@ -107,7 +128,8 @@ export function OrderInvoiceModal({ invoice, onClose }: OrderInvoiceModalProps) 
         </div>
 
         {/* Modal Action Buttons: ONLY Download and Track Order */}
-        <div className="flex items-center justify-end gap-2.5 pt-2">
+        <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
+
           <Button
             type="button"
             variant="outline"

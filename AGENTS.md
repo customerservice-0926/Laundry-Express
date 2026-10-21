@@ -1,3 +1,5 @@
+# This project on live and in production so don't delete any data without asking and be carefull about with env keys and useing envs. 
+
 ***Must be Follow***
 1. Does this need to exist?   → no: skip it (YAGNI)
 2. Already in this codebase?  → reuse it, don't rewrite

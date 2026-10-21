@@ -5,6 +5,11 @@ import type { UserAddress } from "@/lib/services/address-service";
 import { Plus, Trash2, Edit2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  SERVICEABLE_CITIES,
+  getDefaultZipForCity,
+  getCityForZip,
+} from "@/lib/services/geo-radius-service";
 
 export interface SavedAddress {
   id: string;
@@ -19,13 +24,11 @@ export interface SavedAddress {
 
 export function SettingsAddresses() {
   const [addresses, setAddresses] = React.useState<SavedAddress[]>([]);
-  const [coverageAreas, setCoverageAreas] = React.useState<string[]>([]);
   const [isAdding, setIsAdding] = React.useState(false);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [label, setLabel] = React.useState("Home");
   const [street, setStreet] = React.useState("");
   const [apt, setApt] = React.useState("");
-  const [selectedArea, setSelectedArea] = React.useState("");
   const [city, setCity] = React.useState("");
   const [state, setState] = React.useState("IL");
   const [zip, setZip] = React.useState("");
@@ -41,25 +44,25 @@ export function SettingsAddresses() {
         })));
       }
     }).catch(() => {});
-
-    fetch("/api/content?type=settings").then((r) => r.json()).then((data) => {
-      if (Array.isArray(data.settings?.delivery_zones) && data.settings.delivery_zones.length > 0) {
-        setCoverageAreas(data.settings.delivery_zones);
-      }
-    }).catch(() => {});
   }, []);
 
-  const handleAreaSelect = (areaStr: string) => {
-    setSelectedArea(areaStr);
-    const match = areaStr.match(/^(.+?)(?:\s*\(([0-9]{5})\))?$/);
-    if (match) {
-      setCity(match[1].trim());
-      if (match[2]) setZip(match[2].trim());
+  const handleCitySelect = (selectedCity: string) => {
+    setCity(selectedCity);
+    const defaultZip = getDefaultZipForCity(selectedCity);
+    if (defaultZip) setZip(defaultZip);
+  };
+
+  const handleZipChange = (newVal: string) => {
+    const cleaned = newVal.replace(/\D/g, "").slice(0, 5);
+    setZip(cleaned);
+    if (cleaned.length === 5) {
+      const matchedCity = getCityForZip(cleaned);
+      if (matchedCity) setCity(matchedCity);
     }
   };
 
   const resetForm = () => {
-    setLabel("Home"); setStreet(""); setApt(""); setSelectedArea("");
+    setLabel("Home"); setStreet(""); setApt("");
     setCity(""); setState("IL"); setZip("");
     setIsDefault(false); setIsAdding(false); setEditingId(null);
   };
@@ -71,7 +74,7 @@ export function SettingsAddresses() {
     const newAddr: SavedAddress = {
       id: editingId || `addr-${Date.now()}`,
       label, street: street.trim(), apt: apt.trim() || undefined,
-      city: city.trim(), state: state.trim(), zip: zip.trim(), isDefault,
+      city: city.trim(), state: state.trim() || "IL", zip: zip.trim(), isDefault,
     };
 
     setAddresses((prev) => (editingId ? prev.map((a) => (a.id === editingId ? newAddr : a)) : [newAddr, ...prev]));
@@ -92,41 +95,32 @@ export function SettingsAddresses() {
 
   const handleStartEdit = (addr: SavedAddress) => {
     setEditingId(addr.id); setLabel(addr.label); setStreet(addr.street);
-    setApt(addr.apt || ""); setCity(addr.city); setState(addr.state);
-    setZip(addr.zip); setSelectedArea(`${addr.city} (${addr.zip})`);
-    setIsDefault(addr.isDefault); setIsAdding(true);
+    setApt(addr.apt || ""); setCity(addr.city); setState(addr.state || "IL");
+    setZip(addr.zip); setIsDefault(addr.isDefault); setIsAdding(true);
   };
 
   const handleDelete = async (id: string) => {
     if (addresses.length <= 1) {
-      setDeleteError("You must keep at least one saved address on file. Please add a new address before deleting this one.");
-      setTimeout(() => setDeleteError(null), 5000);
+      setDeleteError("You must keep at least one address on file.");
       return;
     }
     setDeleteError(null);
-    const prev = addresses;
-    setAddresses((cur) => cur.filter((a) => a.id !== id));
+    setAddresses((prev) => prev.filter((a) => a.id !== id));
     try {
-      const res = await fetch(`/api/user/addresses?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok || !data?.success) {
-        setAddresses(prev);
-        setDeleteError(data?.error || "Failed to delete address.");
-        setTimeout(() => setDeleteError(null), 5000);
-      }
+      await fetch(`/api/user/addresses?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     } catch {
-      setAddresses(prev);
-      setDeleteError("Failed to delete address.");
-      setTimeout(() => setDeleteError(null), 5000);
+      setDeleteError("Failed to remove address. Please try again.");
     }
   };
 
+  const isCustomCity = city && !SERVICEABLE_CITIES.some((c) => c.city.toLowerCase() === city.toLowerCase());
+
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base font-black text-slate-900">Saved Delivery Addresses</h3>
-          <p className="text-xs text-slate-500">Pick from our verified service coverage areas and add your doorstep details.</p>
+          <h3 className="text-sm font-bold text-slate-900">Saved Addresses</h3>
+          <p className="text-xs text-slate-500">Manage doorstep pickup and delivery locations within our 40-mile radius.</p>
         </div>
         {!isAdding && (
           <Button size="sm" variant="hero" onClick={() => setIsAdding(true)} className="cursor-pointer text-xs">
@@ -145,17 +139,25 @@ export function SettingsAddresses() {
       {isAdding && (
         <form onSubmit={handleSave} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 text-xs">
           <div>
-            <label className="font-bold text-slate-700 block mb-1">1. Select Covered Service Area *</label>
+            <label className="font-bold text-slate-700 block mb-1">Select Service City (40-Mile Radius) *</label>
             <select
-              value={selectedArea}
-              onChange={(e) => handleAreaSelect(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium"
+              value={city}
+              onChange={(e) => handleCitySelect(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium text-xs"
               required
             >
-              <option value="">-- Choose Active Service Municipality --</option>
-              {coverageAreas.map((area) => (
-                <option key={area} value={area}>{area}</option>
-              ))}
+              <option value="">-- Choose City --</option>
+              {isCustomCity && <option value={city}>{city} (Selected)</option>}
+              <optgroup label="Standard Zone — Free Delivery (0–30 Miles)">
+                {SERVICEABLE_CITIES.filter((c) => !c.isExtended).map((c) => (
+                  <option key={c.city} value={c.city}>{c.city} (Free Delivery)</option>
+                ))}
+              </optgroup>
+              <optgroup label="Extended Service Area — $10 Fee (30–40 Miles)">
+                {SERVICEABLE_CITIES.filter((c) => c.isExtended).map((c) => (
+                  <option key={c.city} value={c.city}>{c.city} ($10 Fee)</option>
+                ))}
+              </optgroup>
             </select>
           </div>
 
@@ -185,8 +187,8 @@ export function SettingsAddresses() {
                 <input type="text" readOnly value="IL" className="w-full px-2 py-2 rounded-xl border border-slate-200 bg-slate-100 font-medium text-center text-slate-700 cursor-not-allowed" />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">ZIP</label>
-                <input type="text" readOnly value={zip} className="w-full px-2 py-2 rounded-xl border border-slate-200 bg-slate-100 font-medium" />
+                <label className="font-bold text-slate-700 block mb-1">ZIP *</label>
+                <input type="text" required maxLength={5} value={zip} onChange={(e) => handleZipChange(e.target.value)} placeholder="60156" className="w-full px-2 py-2 rounded-xl border border-slate-200 bg-white font-medium text-center" />
               </div>
             </div>
           </div>

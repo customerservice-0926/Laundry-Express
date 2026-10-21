@@ -1,6 +1,6 @@
 import type { Order } from "@/types";
 import type { UnifiedInvoiceInput } from "./invoice-html-template";
-import { formatSlotLabel, resolveDetergentName } from "@/lib/utils";
+import { formatSlotLabel, resolveDetergentName, getOrderPriceWithoutTip } from "@/lib/utils";
 
 export interface InvoiceMapperOptions {
   slotTimes?: { s1?: string; e1?: string; s2?: string; e2?: string };
@@ -78,7 +78,9 @@ export function orderToUnifiedInvoice(
         ? "Apple Pay (Stripe)"
         : order.payment_method === "google_pay"
           ? "Google Pay (Stripe)"
-          : order.payment_method || "Stripe 256-Bit Secure Checkout";
+          : order.payment_method === "cash"
+            ? "Cash on Delivery / Pickup"
+            : order.payment_method || "Stripe 256-Bit Secure Checkout";
 
   const detergentName = order.detergent_name || resolveDetergentName(order.detergent_id);
   const doorstepProtocol = order.is_out_of_home
@@ -92,7 +94,18 @@ export function orderToUnifiedInvoice(
   const transactionId =
     options?.transactionId ||
     order.stripe_payment_intent ||
-    `STRIPE-TX-${orderId.replace(/[^A-Za-z0-9]/g, "").slice(-8).toUpperCase()}`;
+    (order.payment_method === "cash" ? `CASH-${orderId}` : `STRIPE-TX-${orderId.replace(/[^A-Za-z0-9]/g, "").slice(-8).toUpperCase()}`);
+
+  let parsedAdditionalItems: { name: string; price: number; quantity: number }[] = [];
+  if (Array.isArray(order.additional_items)) {
+    parsedAdditionalItems = order.additional_items;
+  } else if (typeof order.additional_items === "string") {
+    try {
+      parsedAdditionalItems = JSON.parse(order.additional_items);
+    } catch {}
+  }
+  const computedItemsFee = parsedAdditionalItems.reduce((s, i) => s + (Number(i.price || 0) * Number(i.quantity || 1)), 0);
+  const additionalItemsFee = Number(order.additional_items_fee ?? computedItemsFee);
 
   return {
     orderId,
@@ -102,10 +115,13 @@ export function orderToUnifiedInvoice(
     pickupSlot: slotLabel,
     deliveryDate: order.delivery_date || "Within 24 Hours",
     paymentMethod: methodDisplay,
-    totalAmount: Number(order.total_amount || 0),
+    totalAmount: getOrderPriceWithoutTip(order),
     subtotal: Number(order.subtotal || order.total_amount || 0),
     detergentFee: Number(order.detergent_fee || 0),
     deliveryFee: Number(order.delivery_fee || 0),
+    additionalItemsFee,
+    additionalItems: parsedAdditionalItems,
+    tipAmount: Number(order.tip_amount || 0),
     discountAmount: Number(order.discount_amount || 0),
     transactionId,
     customerName: options?.customerName || order.customer_name || "Valued Customer",

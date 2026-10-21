@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { ShoppingBag, CreditCard, Clock } from "lucide-react";
+import { formatCurrency, getOrderPriceWithoutTip } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils";
 import { PieChart, type PieSlice } from "@/components/shared/pie-chart";
 import type { Order } from "@/types";
 
@@ -27,10 +27,16 @@ export function CustomerOverview({ orders: initialOrders }: CustomerOverviewProp
     }
   }, [initialOrders]);
 
-  const totalSpent = React.useMemo(() => {
+  const totalOrderSpent = React.useMemo(() => {
     return orders
       .filter((o) => o.order_status !== "cancelled")
-      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+      .reduce((sum, o) => sum + getOrderPriceWithoutTip(o), 0);
+  }, [orders]);
+
+  const totalTipsGiven = React.useMemo(() => {
+    return orders
+      .filter((o) => o.order_status !== "cancelled")
+      .reduce((sum, o) => sum + Number(o.tip_amount || 0), 0);
   }, [orders]);
 
   const completedOrders = orders.filter((o) => o.order_status === "completed");
@@ -51,11 +57,13 @@ export function CustomerOverview({ orders: initialOrders }: CustomerOverviewProp
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs space-y-1">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-bold">Total Spent (Transactions)</span>
+            <span className="text-xs font-bold">Total Orders Spent</span>
             <CreditCard className="h-4 w-4 text-emerald-600" />
           </div>
-          <span className="text-2xl font-black text-slate-900 block">{formatCurrency(totalSpent)}</span>
-          <span className="text-[11px] text-emerald-600 font-semibold block">All transactions settled</span>
+          <span className="text-2xl font-black text-slate-900 block">{formatCurrency(totalOrderSpent)}</span>
+          <span className="text-[11px] text-emerald-600 font-semibold block">
+            {totalTipsGiven > 0 ? `+ ${formatCurrency(totalTipsGiven)} driver tips given` : "All orders settled"}
+          </span>
         </div>
 
         <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs space-y-1">
@@ -132,7 +140,10 @@ export function CustomerOverview({ orders: initialOrders }: CustomerOverviewProp
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className="font-black text-slate-900 block">{formatCurrency(ord.total_amount)}</span>
+                      <span className="font-black text-slate-900 block">{formatCurrency(getOrderPriceWithoutTip(ord))}</span>
+                      {Number(ord.tip_amount || 0) > 0 && (
+                        <span className="text-[10px] text-emerald-600 font-semibold block">+{formatCurrency(Number(ord.tip_amount || 0))} tip</span>
+                      )}
                       <Badge variant={isComplete ? "success" : "warning"} className="text-[10px] uppercase font-bold">
                         {ord.order_status.replace(/_/g, " ")}
                       </Badge>

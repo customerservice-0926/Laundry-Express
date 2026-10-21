@@ -14,6 +14,8 @@ export interface UserProfile {
   updated_at: string;
 }
 
+export type User = UserProfile;
+
 export type PricingMode = "per_bag" | "per_lb" | "package";
 
 export interface PricingConfig {
@@ -78,6 +80,16 @@ export interface Promotion {
   is_active: boolean;
 }
 
+export interface AdditionalItem {
+  id: string;
+  name: string;
+  category?: string;
+  price: number;
+  description?: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
 export interface Detergent {
   id: string;
   name: string;
@@ -85,137 +97,6 @@ export interface Detergent {
   is_active: boolean;
   price_adjustment: number;
   created_at?: string;
-}
-
-export type User = UserProfile;
-
-export type OrderStatus = "pending" | "confirmed" | "driver_assigned" | "picked_up" | "in_wash" | "out_for_delivery" | "completed" | "cancelled";
-
-export interface Order {
-  id: string;
-  order_number: string;
-  user_id: string;
-  pricing_mode: PricingMode;
-  package_id?: string | null;
-  package_name?: string | null;
-  detergent_id: string;
-  detergent_name?: string;
-  bag_count: number;
-  estimated_weight_lbs?: number | null;
-  final_weight_lbs?: number | null;
-  pickup_date: string;
-  pickup_slot: "8am-12pm" | "1pm-6pm";
-  delivery_date?: string | null;
-  delivery_slot?: string | null;
-  subtotal: number;
-  detergent_fee?: number;
-  discount_amount: number;
-  coupon_code?: string | null;
-  promotion_id?: string | null;
-  delivery_fee: number;
-  tax_amount: number;
-  total_amount: number;
-  is_out_of_home: boolean;
-  bag_outside_door_confirmed: boolean;
-  customer_name?: string;
-  customer_email?: string;
-  customer_phone?: string;
-  pickup_address?: string;
-  street_address?: string;
-  apt_unit?: string;
-  city?: string;
-  state?: string;
-  zip_code?: string;
-  customer_notes?: string;
-  special_instructions?: string;
-  admin_notes?: string;
-  payment_method?: string;
-  payment_status?: string;
-  invoice_email_sent_at?: string | null;
-  order_status: OrderStatus;
-  stripe_customer_id?: string;
-  stripe_payment_method_id?: string;
-  card_brand?: string;
-  card_last4?: string;
-  stripe_payment_intent?: string;
-  has_preexisting_damage?: boolean;
-  damage_notes?: string;
-  damage_photo_url?: string;
-  customer_notified_damage?: boolean;
-  accepted_at?: string;
-  created_at: string;
-  updated_at: string;
-  // Joined fields
-  user?: UserProfile;
-  detergent?: Detergent;
-  proofs?: OrderProof[];
-  payment?: PaymentRecord;
-  review?: OrderReview;
-}
-
-export interface OrderProof {
-  id: string;
-  order_id: string;
-  proof_type: "pickup" | "dropoff" | "damage";
-  image_url: string;
-  notes?: string;
-  uploaded_by: string;
-  created_at: string;
-}
-
-export type PaymentStatus =
-  | "pending"
-  | "processing"
-  | "succeeded"
-  | "failed"
-  | "refunded"
-  | "partially_refunded";
-
-export interface PaymentRecord {
-  id: string;
-  payment_number: string;
-  order_id: string;
-  user_id: string;
-  provider: "stripe" | "package_credit";
-  provider_payment_id?: string;
-  amount: number;
-  currency: string;
-  payment_method_type: string;
-  status: PaymentStatus;
-  receipt_url?: string;
-  failure_reason?: string;
-  refunded_amount: number;
-  metadata?: Record<string, unknown>;
-  paid_at?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ReviewPhoto {
-  id: string;
-  review_id: string;
-  photo_url: string;
-  display_order: 1 | 2 | 3;
-  created_at: string;
-}
-
-export interface OrderReview {
-  id: string;
-  order_id: string;
-  user_id: string;
-  rating: number;
-  comment: string;
-  status: "pending" | "approved" | "rejected";
-  moderated_by?: string;
-  moderation_note?: string;
-  moderated_at?: string;
-  created_at: string;
-  updated_at?: string;
-  customer_name?: string;
-  photo_urls?: string[];
-  photos?: ReviewPhoto[];
-  user?: { full_name: string };
-  order?: { order_number: string };
 }
 
 export interface ActivityLog {
@@ -232,16 +113,7 @@ export interface ActivityLog {
   created_at: string;
 }
 
-export interface AdminPaymentTransaction {
-  id: string;
-  order_id: string;
-  order_number: string;
-  customer_name: string;
-  customer_email: string;
-  date: string;
-  amount: number;
-  method: string;
-  card_last4: string;
-  status: "succeeded" | "pending" | "failed" | "refunded";
-  stripe_payment_intent: string;
-}
+// Re-export modular types
+export * from "./order";
+export * from "./payment";
+export * from "./review";

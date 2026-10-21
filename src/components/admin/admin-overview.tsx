@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Users, Package, ShoppingBag, ShieldCheck } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { Users, Package, ShoppingBag, ShieldCheck, Heart } from "lucide-react";
+import { formatCurrency, getOrderPriceWithoutTip } from "@/lib/utils";
 import { AdminAnalytics } from "./admin-analytics";
 import type { Order } from "@/types";
 import type { CustomerAccount } from "./customer-detail-modal";
@@ -22,6 +22,7 @@ export function AdminOverview({ orders, customers }: AdminOverviewProps) {
   const newOrdersCount = orders.filter((o) => o.order_status === "confirmed" || o.order_status === "pending").length;
   const inWashCount = orders.filter((o) => o.order_status === "in_wash" || o.order_status === "picked_up").length;
   const outForDeliveryCount = orders.filter((o) => o.order_status === "out_for_delivery").length;
+  const totalTipsAllTime = React.useMemo(() => orders.reduce((sum, o) => sum + Number(o.tip_amount || 0), 0), [orders]);
 
   return (
     <div className="space-y-6">
@@ -64,7 +65,10 @@ export function AdminOverview({ orders, customers }: AdminOverviewProps) {
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="font-black text-slate-900 block">{formatCurrency(ord.total_amount)}</span>
+                    <span className="font-black text-slate-900 block">{formatCurrency(getOrderPriceWithoutTip(ord))}</span>
+                    {Number(ord.tip_amount || 0) > 0 && (
+                      <span className="text-[10px] text-emerald-600 font-semibold block">+{formatCurrency(Number(ord.tip_amount || 0))} tip</span>
+                    )}
                     <span className="mt-1 inline-block text-[10px] uppercase font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
                       {ord.order_status.replace(/_/g, " ")}
                     </span>
@@ -114,6 +118,17 @@ export function AdminOverview({ orders, customers }: AdminOverviewProps) {
                 </div>
               </div>
               <span className="text-sm font-black text-slate-900">{outForDeliveryCount}</span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-teal-100 text-teal-700"><Heart className="h-4 w-4" /></div>
+                <div>
+                  <span className="font-bold text-slate-900 block">Total Gratuity Distributed</span>
+                  <span className="text-[11px] text-slate-500">Driver &amp; crew tips pooled</span>
+                </div>
+              </div>
+              <span className="text-sm font-black text-teal-700">{formatCurrency(totalTipsAllTime)}</span>
             </div>
 
             <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
