@@ -9,6 +9,7 @@ import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
 import { orderToUnifiedInvoice } from "@/lib/invoice/invoice-utils";
 import { OrderInvoiceCard } from "@/components/booking/order-invoice-card";
+import { formatCurrency } from "@/lib/utils";
 import { useOrdersRealtime } from "@/hooks/use-orders-realtime";
 import type { Order } from "@/types";
 
@@ -131,6 +132,40 @@ function SuccessContent() {
             : "Order recorded. Awaiting confirmation."}
         </p>
       </div>
+
+      {(() => {
+        const paidToday = Number(order.delivery_fee || 0) + Number(order.tip_amount || 0);
+        const nextCharge = Math.max(0, Number(order.total_amount || 0) - paidToday);
+        return (
+          <div className="max-w-xl mx-auto p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-left space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Payment Breakdown</span>
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                {paid ? "Stripe Verified & Saved" : "Confirmed"}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block">1. Paid Today via Stripe</span>
+                <span className="text-xl font-black text-slate-900 block">{paidToday > 0 ? formatCurrency(paidToday) : "$0.00"}</span>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  {paidToday > 0 ? "Doorstep delivery fee & driver tip" : "Free delivery · Card verified on file ($0.00)"}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-pink-50/60 border border-pink-200/80 space-y-1">
+                <span className="text-[10px] font-bold text-primary uppercase tracking-wide block">2. Next Charge (After Pickup)</span>
+                <span className="text-xl font-black text-primary block">{formatCurrency(nextCharge)}</span>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  {order.pricing_mode === "per_lb"
+                    ? "Laundry wash based on scale weight upon pickup"
+                    : "Laundry wash & fold charged to card on file once in custody"}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {invoiceData && (
         <div className="w-full text-left">

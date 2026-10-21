@@ -58,6 +58,8 @@ export interface Order {
   coupon_code?: string | null;
   promotion_id?: string | null;
   delivery_fee: number;
+  delivery_fee_paid?: boolean;
+  tip_paid?: boolean;
   tax_amount: number;
   total_amount: number;
   is_out_of_home: boolean;

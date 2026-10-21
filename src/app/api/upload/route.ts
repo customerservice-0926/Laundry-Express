@@ -6,16 +6,7 @@ import {
 } from "@/lib/services/image-storage-service";
 import { OrderService } from "@/lib/services/order-service";
 import { getVerifiedUser } from "@/lib/auth-request";
-
-/**
- * Universal Image Upload Route: POST /api/upload
- *
- * Handles authenticated file uploads to Supabase Storage:
- * - Strictly enforces user authentication
- * - Only administrators may upload operational order proofs
- * - Restricts uploads to safe raster image formats (JPEG, PNG, WebP)
- * - Blocks raw SVGs to prevent Stored XSS vectors
- */
+import { verifyReviewToken } from "@/lib/services/review-token-service";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -28,32 +19,36 @@ const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB maximum image ceiling
 export async function POST(req: NextRequest) {
   try {
     const verified = await getVerifiedUser(req);
-    if (!verified) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized. Please sign in to upload assets." },
-        { status: 401 }
-      );
-    }
-    const { user } = verified;
-
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const bucket = (formData.get("bucket") as string) || STORAGE_BUCKETS.AVATARS;
     const requestedEntityId = (formData.get("entityId") as string) || "";
     const subType = (formData.get("subType") as string) || "";
+    const token = (formData.get("token") as string) || "";
+
+    const verifiedToken = bucket === STORAGE_BUCKETS.REVIEW_PHOTOS ? verifyReviewToken(token) : { valid: false };
+    const isTokenAuthorized = Boolean(verifiedToken.valid && (verifiedToken.orderNumber === requestedEntityId || verifiedToken.orderId === requestedEntityId));
+
+    if (!verified && !isTokenAuthorized) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Please sign in or use your review link to upload." },
+        { status: 401 }
+      );
+    }
+    const user = verified?.user;
 
     if (![STORAGE_BUCKETS.AVATARS, STORAGE_BUCKETS.ORDER_PROOFS, STORAGE_BUCKETS.REVIEW_PHOTOS].includes(bucket as typeof STORAGE_BUCKETS[keyof typeof STORAGE_BUCKETS])) {
       return NextResponse.json({ success: false, error: "Invalid upload destination." }, { status: 400 });
     }
 
-    if (bucket === STORAGE_BUCKETS.ORDER_PROOFS && user.role !== "admin") {
+    if (bucket === STORAGE_BUCKETS.ORDER_PROOFS && user?.role !== "admin") {
       return NextResponse.json(
         { success: false, error: "Forbidden. Order proofs can only be uploaded by operations staff." },
         { status: 403 }
       );
     }
 
-    let entityId = user.id;
+    let entityId = user?.id || `customer-${requestedEntityId}`;
     if (bucket !== STORAGE_BUCKETS.AVATARS) {
       if (!requestedEntityId) {
         return NextResponse.json({ success: false, error: "An order is required for this upload." }, { status: 400 });
@@ -61,14 +56,17 @@ export async function POST(req: NextRequest) {
       const order = await OrderService.getOrderByNumber(requestedEntityId);
       if (!order) return NextResponse.json({ success: false, error: "Order not found." }, { status: 404 });
       if (bucket === STORAGE_BUCKETS.REVIEW_PHOTOS) {
-        if (order.user_id !== user.id || order.order_status !== "completed") {
+        if (!isTokenAuthorized && order.user_id !== user?.id) {
           return NextResponse.json({ success: false, error: "Review photos are only allowed for your completed orders." }, { status: 403 });
+        }
+        if (order.order_status !== "completed") {
+          return NextResponse.json({ success: false, error: "Review photos are only allowed for completed orders." }, { status: 403 });
         }
         const photoIndex = Number(subType);
         if (!Number.isInteger(photoIndex) || photoIndex < 1 || photoIndex > 3) {
           return NextResponse.json({ success: false, error: "Photo number must be between 1 and 3." }, { status: 400 });
         }
-      } else if (user.role !== "admin") {
+      } else if (user?.role !== "admin") {
         return NextResponse.json({ success: false, error: "Forbidden." }, { status: 403 });
       }
       entityId = order.id;

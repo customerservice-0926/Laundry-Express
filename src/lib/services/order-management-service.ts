@@ -127,21 +127,14 @@ export class OrderManagementService {
     };
 
     const updateRecord: Record<string, unknown> = {
-      plan_type: mode,
-      bag_count: bagCount,
+      plan_type: mode, bag_count: bagCount,
       estimated_weight_lbs: mode === "per_lb" ? finalWeight : 0,
-      final_weight_lbs: finalWeight,
-      weight_lbs: mode === "per_lb" ? finalWeight : 0,
-      subtotal,
-      detergent_id: updates.detergent_id ?? currentOrder.detergent_id,
+      final_weight_lbs: finalWeight, weight_lbs: mode === "per_lb" ? finalWeight : 0,
+      subtotal, detergent_id: updates.detergent_id ?? currentOrder.detergent_id,
       detergent_name: updates.detergent_name ?? currentOrder.detergent_name,
-      detergent_fee: detergentFee,
-      additional_items: additionalItems,
-      additional_items_fee: additionalItemsFee,
-      tip_amount: tipAmount,
-      distance_surcharge: distanceSurcharge,
-      delivery_fee: deliveryFee,
-      total_amount: totalAmount,
+      detergent_fee: detergentFee, additional_items: additionalItems,
+      additional_items_fee: additionalItemsFee, tip_amount: tipAmount,
+      distance_surcharge: distanceSurcharge, delivery_fee: deliveryFee, total_amount: totalAmount,
       pickup_date: updates.pickup_date ?? currentOrder.pickup_date,
       pickup_time_slot: updates.pickup_slot ?? currentOrder.pickup_slot,
       dropoff_date: updates.delivery_date !== undefined ? updates.delivery_date : currentOrder.delivery_date,
@@ -176,9 +169,13 @@ export class OrderManagementService {
 
     const savedOrder = mapOrderRecord(updated);
 
-    // If customer has a card on file, cut the cost off-session upon changing the value
+    // Deduct upfront delivery and tips so customer card is only charged remaining wash/items balance
     const hasCard = Boolean((savedOrder.stripe_customer_id || currentOrder.stripe_customer_id) && (savedOrder.stripe_payment_method_id || currentOrder.stripe_payment_method_id));
-    const toCharge = !isPaid ? savedOrder.total_amount : savedOrder.total_amount > currentOrder.total_amount ? Math.round((savedOrder.total_amount - currentOrder.total_amount) * 100) / 100 : 0;
+    const unpaidDelivery = savedOrder.delivery_fee_paid ? 0 : Number(savedOrder.delivery_fee || 0);
+    const unpaidTip = savedOrder.tip_paid ? 0 : Number(savedOrder.tip_amount || 0);
+    const washAndItems = Math.max(0, Number(savedOrder.subtotal || 0) + Number(savedOrder.detergent_fee || 0) + Number(savedOrder.additional_items_fee || 0) - Number(savedOrder.discount_amount || 0));
+    const remainingToCharge = Math.round((washAndItems + unpaidDelivery + unpaidTip) * 100) / 100;
+    const toCharge = !isPaid ? remainingToCharge : savedOrder.total_amount > currentOrder.total_amount ? Math.round((savedOrder.total_amount - currentOrder.total_amount) * 100) / 100 : 0;
 
     let cardCharged = false, chargedAmount = 0, chargeMessage = "Order updated successfully.";
     if (toCharge > 0 && updates.charge_card !== false) {

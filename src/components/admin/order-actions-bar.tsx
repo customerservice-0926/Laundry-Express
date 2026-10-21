@@ -27,19 +27,32 @@ export function OrderActionsBar({
   const [isActionLoading, setIsActionLoading] = React.useState(false);
 
   const isCompletedOrCancelled = order.order_status === "completed" || order.order_status === "cancelled";
-  const hasCardOnFile = Boolean(order.stripe_customer_id && (order.stripe_payment_method_id || order.card_last4));
+  const hasCardOnFile = Boolean(
+    order.stripe_payment_method_id ||
+    order.card_last4 ||
+    (order.stripe_customer_id && (order.stripe_payment_method_id || order.card_last4 || order.payment_status === "authorized")) ||
+    (order.stripe_payment_intent && !order.stripe_payment_intent.startsWith("PHONE-"))
+  );
   const isPaid = order.payment_status === "paid", isCash = order.payment_method === "cash";
+  const isPickedUpOrLater = ["picked_up", "in_wash", "out_for_delivery", "completed"].includes(order.order_status);
+  const [chargeFailed, setChargeFailed] = React.useState(order.payment_status === "failed");
 
   const handleChargeCard = async () => {
     setIsActionLoading(true);
     try {
       const res = await fetch(`/api/orders/${order.id}/charge-card`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: order.total_amount }) });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || "Failed to charge card.");
+      if (!res.ok || !data.success) {
+        setChargeFailed(true);
+        throw new Error(data.error || "Failed to charge card.");
+      }
+      setChargeFailed(false);
       toast.success("Card charged successfully! Receipt emailed to customer.");
       if (data.order && onOrderUpdated) onOrderUpdated(data.order);
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Unable to charge card."); }
-    finally { setIsActionLoading(false); }
+    } catch (err) {
+      setChargeFailed(true);
+      toast.error(err instanceof Error ? err.message : "Unable to charge card.");
+    } finally { setIsActionLoading(false); }
   };
 
   const handleSendPaymentLink = async () => {
@@ -79,12 +92,15 @@ export function OrderActionsBar({
     finally { setIsActionLoading(false); }
   };
 
+  const showSendPaymentLink = !isPaid && !isCash && !isCompletedOrCancelled && (!hasCardOnFile || chargeFailed || order.payment_status === "failed");
+  const showChargeCard = !isPaid && !isCash && hasCardOnFile && isPickedUpOrLater && !isCompletedOrCancelled && order.total_amount > 0;
+
   return (
     <div className="space-y-3 pt-3 border-t border-slate-100">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Send Payment Link if customer has not paid with card */}
-          {!isPaid && !isCash && !isCompletedOrCancelled && (
+          {/* Send Payment Link only if customer has no card on file, or if card charge failed */}
+          {showSendPaymentLink && (
             <Button variant="outline" size="sm" disabled={isActionLoading} onClick={handleSendPaymentLink} className="text-primary border-pink-200 hover:bg-pink-50 font-bold">
               <Send className="h-3.5 w-3.5 mr-1" /> Send Payment Link
             </Button>
@@ -104,44 +120,28 @@ export function OrderActionsBar({
             </Button>
           )}
 
-          {/* Charge Card cuts the cost from card on file once laundry is brought in / inspected */}
-          {!isPaid && hasCardOnFile && !isCompletedOrCancelled && order.total_amount > 0 && (
+          {/* Charge Card cuts the cost from card on file ONCE laundry has been picked up */}
+          {showChargeCard && (
             <Button variant="hero" size="sm" disabled={isActionLoading} onClick={handleChargeCard} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
               <CreditCard className="h-3.5 w-3.5 mr-1" /> Charge Card (${order.total_amount.toFixed(2)})
             </Button>
           )}
 
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isActionLoading}
-            onClick={() => setIsDeleteOpen(true)}
-            className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
-          >
+          <Button variant="outline" size="sm" disabled={isActionLoading} onClick={() => setIsDeleteOpen(true)} className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700">
             <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
           </Button>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Weigh & Charge is only for active, uncompleted, weighed-by-pound orders prior to payment */}
-          {onWeighOrder && !isCompletedOrCancelled && order.pricing_mode === "per_lb" && !isPaid && (
-            <Button
-              variant="hero"
-              size="sm"
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
-              onClick={() => { onClose(); onWeighOrder(order); }}
-            >
+          {/* Weigh & Charge is only for active, uncompleted, weighed-by-pound orders once in custody (picked up or in wash) */}
+          {onWeighOrder && !isCompletedOrCancelled && order.pricing_mode === "per_lb" && !isPaid && (isPickedUpOrLater || order.order_status === "driver_assigned") && (
+            <Button variant="hero" size="sm" className="bg-amber-600 hover:bg-amber-700 text-white font-bold" onClick={() => { onClose(); onWeighOrder(order); }}>
               <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Weigh &amp; Charge
             </Button>
           )}
 
           {onOpenProofModal && order.order_status === "in_wash" && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-rose-600 border-rose-200 hover:bg-rose-50 font-bold"
-              onClick={() => { onClose(); onOpenProofModal(order, "damage"); }}
-            >
+            <Button variant="outline" size="sm" className="text-rose-600 border-rose-200 hover:bg-rose-50 font-bold" onClick={() => { onClose(); onOpenProofModal(order, "damage"); }}>
               <AlertTriangle className="h-3.5 w-3.5 mr-1 shrink-0" /> Report Damage
             </Button>
           )}
@@ -182,9 +182,7 @@ export function OrderActionsBar({
               case "out_for_delivery":
                 return (
                   <Button
-                    variant="hero"
-                    size="sm"
-                    disabled={isActionLoading || order.payment_status === "pending"}
+                    variant="hero" size="sm" disabled={isActionLoading || order.payment_status === "pending"}
                     className={order.payment_status === "pending" ? "bg-slate-400 cursor-not-allowed text-white font-bold" : "bg-slate-800 hover:bg-slate-900 text-white font-bold"}
                     onClick={() => {
                       if (order.payment_status === "pending") {

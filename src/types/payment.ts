@@ -34,6 +34,10 @@ export interface AdminPaymentTransaction {
   customer_email: string;
   date: string;
   amount: number;
+  delivery_fee?: number;
+  tip_amount?: number;
+  order_price?: number;
+  status_reason?: string;
   method: string;
   card_last4: string;
   status: "succeeded" | "pending" | "failed" | "refunded";

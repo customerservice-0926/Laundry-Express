@@ -1,6 +1,6 @@
 import type { Order } from "@/types";
 import type { UnifiedInvoiceInput } from "./invoice-html-template";
-import { formatSlotLabel, resolveDetergentName } from "@/lib/utils";
+import { formatSlotLabel, resolveDetergentName, getOrderPriceWithoutTip } from "@/lib/utils";
 
 export interface InvoiceMapperOptions {
   slotTimes?: { s1?: string; e1?: string; s2?: string; e2?: string };
@@ -115,7 +115,7 @@ export function orderToUnifiedInvoice(
     pickupSlot: slotLabel,
     deliveryDate: order.delivery_date || "Within 24 Hours",
     paymentMethod: methodDisplay,
-    totalAmount: Number(order.total_amount || 0),
+    totalAmount: getOrderPriceWithoutTip(order),
     subtotal: Number(order.subtotal || order.total_amount || 0),
     detergentFee: Number(order.detergent_fee || 0),
     deliveryFee: Number(order.delivery_fee || 0),

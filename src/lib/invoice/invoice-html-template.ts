@@ -165,7 +165,7 @@ export function generateInvoiceHtml(inv: UnifiedInvoiceInput): string {
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#64748b;font-size:12px">Payment Method</td><td align="right" style="padding:9px 14px;font-weight:700;color:#1e293b;font-size:12px">${paymentDisplay}</td></tr>
             <tr bgcolor="#ffffff" style="border-top:1px solid #f1f5f9"><td style="padding:9px 14px;color:#64748b;font-size:12px">Stripe Transaction ID</td><td align="right" style="padding:9px 14px;font-weight:700;color:#334155;font-family:monospace;font-size:10px">${txId}</td></tr>
             <tr bgcolor="#fdf2f8" style="border-top:1px solid #fbcfe8">
-              <td style="padding:12px 14px"><span style="display:block;font-size:12px;font-weight:900;color:#0f172a">Total Cleared &amp; Authorized</span><span style="display:block;font-size:10px;color:#64748b">Captured securely via Stripe TLS 1.3 gateway</span></td>
+              <td style="padding:12px 14px"><span style="display:block;font-size:12px;font-weight:900;color:#0f172a">Total Order Price (Excl. Tip)</span><span style="display:block;font-size:10px;color:#64748b">Service, items &amp; delivery</span></td>
               <td align="right" style="padding:12px 14px;font-size:20px;font-weight:900;color:#be185d">${formatCurrency(totalAmount)}</td>
             </tr>
           </table>

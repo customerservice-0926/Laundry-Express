@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Users, Package, ShoppingBag, ShieldCheck, Heart } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, getOrderPriceWithoutTip } from "@/lib/utils";
 import { AdminAnalytics } from "./admin-analytics";
 import type { Order } from "@/types";
 import type { CustomerAccount } from "./customer-detail-modal";
@@ -65,7 +65,10 @@ export function AdminOverview({ orders, customers }: AdminOverviewProps) {
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="font-black text-slate-900 block">{formatCurrency(ord.total_amount)}</span>
+                    <span className="font-black text-slate-900 block">{formatCurrency(getOrderPriceWithoutTip(ord))}</span>
+                    {Number(ord.tip_amount || 0) > 0 && (
+                      <span className="text-[10px] text-emerald-600 font-semibold block">+{formatCurrency(Number(ord.tip_amount || 0))} tip</span>
+                    )}
                     <span className="mt-1 inline-block text-[10px] uppercase font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
                       {ord.order_status.replace(/_/g, " ")}
                     </span>

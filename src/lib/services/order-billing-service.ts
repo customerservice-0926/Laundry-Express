@@ -13,6 +13,9 @@ export interface CardAuthDetails {
   stripePaymentMethodId: string;
   cardBrand?: string;
   cardLast4?: string;
+  deliveryFeePaid?: boolean;
+  tipPaid?: boolean;
+  initialPaidAmount?: number;
 }
 
 export class OrderBillingService {
@@ -21,9 +24,20 @@ export class OrderBillingService {
    */
   static async recordCardAuthorized(orderId: string, details: CardAuthDetails): Promise<Order | null> {
     const current = await OrderService.getOrderByNumber(orderId);
-    if (current && (current.payment_status === "authorized" || current.order_status === "confirmed") && current.stripe_payment_method_id === details.stripePaymentMethodId) {
+    if (current && (current.payment_status === "authorized" || current.order_status === "confirmed") && current.stripe_payment_method_id === details.stripePaymentMethodId && current.delivery_fee_paid && current.tip_paid) {
       return current;
     }
+    const currentAddr = (current?.pickup_address && typeof current.pickup_address === "object")
+      ? (current.pickup_address as Record<string, unknown>)
+      : {};
+    const updatedAddr = {
+      ...currentAddr,
+      delivery_fee_paid: details.deliveryFeePaid ?? currentAddr.delivery_fee_paid ?? true,
+      tip_paid: details.tipPaid ?? currentAddr.tip_paid ?? true,
+      initial_paid: true,
+      initial_paid_amount: details.initialPaidAmount ?? currentAddr.initial_paid_amount,
+    };
+
     const supabase = createAdminSupabaseClient();
     let { data, error } = await supabase
       .from("orders")
@@ -34,6 +48,7 @@ export class OrderBillingService {
         card_last4: details.cardLast4 || "",
         payment_status: "authorized",
         order_status: "confirmed",
+        pickup_address: updatedAddr,
         updated_at: new Date().toISOString(),
       })
       .eq("id", orderId)
@@ -51,6 +66,7 @@ export class OrderBillingService {
           card_brand: details.cardBrand || "card",
           card_last4: details.cardLast4 || "",
           order_status: "confirmed",
+          pickup_address: updatedAddr,
           updated_at: new Date().toISOString(),
         })
         .eq("id", orderId)
@@ -113,12 +129,13 @@ export class OrderBillingService {
     const defaultRate = pricing.pound_price > 0 ? pricing.pound_price : 1.5;
     const poundRate = (options?.customPoundRate && options.customPoundRate > 0) ? options.customPoundRate : defaultRate;
     const subtotal = Math.round(weightLbs * poundRate * 100) / 100;
-    const deliveryFee = weightLbs >= pricing.free_delivery_lbs ? 0 : pricing.standard_delivery_fee;
     const detergentFee = Number(order.detergent_fee || 0);
     const additionalItemsFee = Number(order.additional_items_fee || 0);
-    const tipAmount = Number(order.tip_amount || 0);
-    const totalAmount = Math.max(0, subtotal + detergentFee + additionalItemsFee + tipAmount + deliveryFee - Number(order.discount_amount || 0));
-    const amountCents = Math.round(totalAmount * 100);
+    const discount = Number(order.discount_amount || 0);
+    // Tips and delivery fee were collected at confirmation; charge only scale wash & specialty items
+    const chargeNowAmount = Math.max(0, subtotal + detergentFee + additionalItemsFee - discount);
+    const totalAmount = chargeNowAmount;
+    const amountCents = Math.round(chargeNowAmount * 100);
 
     const hasCardOnFile = Boolean(order.stripe_customer_id && order.stripe_payment_method_id && stripe);
     let paymentIntentId: string | null = null;
@@ -168,14 +185,16 @@ export class OrderBillingService {
       });
     }
 
-    const nextStatus = (order.order_status === "confirmed" || order.order_status === "driver_assigned") ? "in_wash" : order.order_status;
+    const deliveryFee = Number(order.delivery_fee || 0);
+    const orderPrice = Math.max(0, subtotal + detergentFee + additionalItemsFee + deliveryFee - discount);
+    const nextStatus = (order.order_status === "confirmed" || order.order_status === "driver_assigned" || order.order_status === "picked_up") ? "in_wash" : order.order_status;
     const { data: updatedRecord, error: updateError } = await supabase
       .from("orders")
       .update({
         final_weight_lbs: weightLbs,
         subtotal,
         delivery_fee: deliveryFee,
-        total_amount: totalAmount,
+        total_amount: orderPrice,
         payment_status: paymentIntentId ? "paid" : (order.payment_status === "paid" ? "paid" : "authorized"),
         stripe_payment_intent_id: paymentIntentId || order.stripe_payment_intent,
         order_status: nextStatus,
@@ -190,7 +209,7 @@ export class OrderBillingService {
     }
 
     const updatedOrder = await OrderService.getOrderByNumber(order.id);
-    if (!updatedOrder) return { success: true, totalAmount };
+    if (!updatedOrder) return { success: true, totalAmount: chargeNowAmount };
 
     // Broadcast live event for real-time dashboard updates
     void broadcastOrderEvent({
@@ -198,25 +217,18 @@ export class OrderBillingService {
       orderId: updatedOrder.id,
       orderNumber: updatedOrder.order_number,
       orderStatus: updatedOrder.order_status,
-      totalAmount,
-      userId: updatedOrder.user_id,
-      customerEmail: updatedOrder.customer_email,
-      customerName: updatedOrder.customer_name,
+      totalAmount, userId: updatedOrder.user_id,
+      customerEmail: updatedOrder.customer_email, customerName: updatedOrder.customer_name,
       updatedAt: new Date().toISOString(),
     });
 
-    // Generate & email itemized invoice with scale weight
     try {
       const settings = await ContentService.getSettings();
       const invoicePayload = orderToUnifiedInvoice(updatedOrder, {
-        slotTimes: settings
-          ? { s1: settings.slot1_start, e1: settings.slot1_end, s2: settings.slot2_start, e2: settings.slot2_end }
-          : undefined,
-        customerName: updatedOrder.customer_name,
-        customerEmail: updatedOrder.customer_email,
+        slotTimes: settings ? { s1: settings.slot1_start, e1: settings.slot1_end, s2: settings.slot2_start, e2: settings.slot2_end } : undefined,
+        customerName: updatedOrder.customer_name, customerEmail: updatedOrder.customer_email,
         transactionId: paymentIntentId || updatedOrder.stripe_payment_intent || undefined,
       });
-
       if (invoicePayload.customerEmail) {
         await sendInvoiceEmail(invoicePayload as unknown as InvoiceEmailPayload);
         await OrderService.markInvoiceEmailSent(updatedOrder.id);

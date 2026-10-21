@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Tag, ShieldCheck, ArrowLeft, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { Lock, Tag, ShieldCheck, ArrowLeft, ArrowRight, Loader2, CheckCircle2, CreditCard, Sparkles } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { CalculatedPriceResult } from "@/lib/stripe/pricing-calc";
@@ -24,20 +24,14 @@ interface StepPaymentProps {
 }
 
 export function StepPayment({
-  priceResult,
-  pricingMode = "per_bag",
-  promoCode,
-  onPromoCodeChange,
-  onApplyPromo,
-  promoError,
-  tipAmount = 0,
-  onTipChange,
-  isProcessing,
-  onConfirm,
-  onBack,
+  priceResult, pricingMode = "per_bag", promoCode, onPromoCodeChange, onApplyPromo,
+  promoError, tipAmount = 0, onTipChange, isProcessing, onConfirm, onBack,
 }: StepPaymentProps) {
-  const { subtotal, detergent_fee, additional_items_fee, delivery_fee, distance_miles, discount_amount, total_amount } = priceResult;
+  const { subtotal, detergent_fee, additional_items_fee, delivery_fee, discount_amount, total_amount } = priceResult;
   const isFreeDelivery = delivery_fee === 0;
+  const effectiveTip = typeof tipAmount === "number" ? tipAmount : priceResult.tip_amount || 0;
+  const amountDueToday = delivery_fee + effectiveTip;
+  const amountChargedLater = Math.max(0, subtotal + detergent_fee + additional_items_fee - discount_amount);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -52,11 +46,9 @@ export function StepPayment({
           </span>
         </div>
 
-        {onTipChange && (
-          <StepTipSelector tipAmount={tipAmount} onTipChange={onTipChange} />
-        )}
+        {onTipChange && <StepTipSelector tipAmount={tipAmount} onTipChange={onTipChange} />}
 
-        {/* Price Breakdown */}
+        {/* 1. Itemized Cost Breakdown */}
         <div className="space-y-2 text-xs">
           <div className="flex justify-between text-slate-600">
             <span>Laundry Wash</span>
@@ -75,22 +67,11 @@ export function StepPayment({
             </div>
           )}
           <div className="flex justify-between items-center text-slate-600">
-            <span>
-              Doorstep Delivery{" "}
-              {isFreeDelivery && (
-                <span className="text-[10px] font-bold text-emerald-700 ml-1">FREE</span>
-              )}
-            </span>
+            <span>Doorstep Delivery {isFreeDelivery && <span className="text-[10px] font-bold text-emerald-700 ml-1">FREE</span>}</span>
             <span className={isFreeDelivery ? "font-bold text-emerald-600" : "font-semibold text-slate-900"}>
               {isFreeDelivery ? "$0.00" : formatCurrency(delivery_fee)}
             </span>
           </div>
-          {tipAmount > 0 && (
-            <div className="flex justify-between text-slate-600">
-              <span>Driver / Service Gratuity</span>
-              <span className="font-semibold text-emerald-600">+{formatCurrency(tipAmount)}</span>
-            </div>
-          )}
           {discount_amount > 0 && (
             <div className="flex justify-between text-emerald-600 font-medium">
               <span>Coupon Discount</span>
@@ -98,15 +79,62 @@ export function StepPayment({
             </div>
           )}
           <div className="flex justify-between font-black text-slate-900 text-sm border-t border-slate-200 pt-2 mt-1">
-            <span>{pricingMode === "per_lb" ? "Est. Total (Pay After Weighing)" : "Total Payable"}</span>
-            <span className="text-base text-primary font-black">{formatCurrency(total_amount)}</span>
+            <span>Order Price (Service &amp; Delivery)</span>
+            <span className="text-base text-slate-900 font-black">{formatCurrency(total_amount)}</span>
           </div>
-          {pricingMode === "per_lb" && (
-            <div className="flex justify-between font-bold text-emerald-700 text-xs bg-emerald-50 p-2 rounded-xl border border-emerald-200">
-              <span>Amount Charged Today:</span>
-              <span className="font-black">$0.00 (Card Authorization Only)</span>
+          {effectiveTip > 0 && (
+            <div className="flex justify-between items-center text-xs text-emerald-700 font-semibold pt-1">
+              <span>Driver Tip (Additional Gratuity)</span>
+              <span>+{formatCurrency(effectiveTip)}</span>
             </div>
           )}
+        </div>
+
+        {/* 2. Transparent 2-Phase Payment Schedule */}
+        <div className="p-4 rounded-2xl bg-linear-to-br from-pink-50/70 via-white to-slate-50 border-2 border-pink-200/90 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5 text-primary" />
+              Payment Schedule (What You Pay Now vs. Next)
+            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-100 text-primary-dark">
+              No Surprise Fees
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            {/* Step 1: Paid Today */}
+            <div className="p-3.5 rounded-xl bg-white border border-pink-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">1. Paid Today via Stripe</span>
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">Checkout Now</span>
+              </div>
+              <span className="text-2xl font-black text-emerald-700 block">
+                {amountDueToday > 0 ? formatCurrency(amountDueToday) : "$0.00"}
+              </span>
+              <p className="text-[11px] text-slate-600 font-medium leading-snug">
+                {amountDueToday > 0
+                  ? `${delivery_fee > 0 ? `Delivery Fee (${formatCurrency(delivery_fee)})` : "Free Delivery"}${effectiveTip > 0 ? ` + Driver Tip (${formatCurrency(effectiveTip)})` : ""}`
+                  : "Free Delivery · Card verified & saved on file ($0.00 charged today)"}
+              </p>
+            </div>
+
+            {/* Step 2: Next Charge */}
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">2. Next Charge (After Pickup)</span>
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-pink-50 text-primary">In Custody</span>
+              </div>
+              <span className="text-2xl font-black text-primary block">
+                {formatCurrency(amountChargedLater)}
+              </span>
+              <p className="text-[11px] text-slate-600 font-medium leading-snug">
+                {pricingMode === "per_lb"
+                  ? "Laundry wash based on scale weight measured upon pickup"
+                  : "Laundry wash, fold & extras charged to your card on file once picked up"}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Promo Code */}
@@ -139,7 +167,7 @@ export function StepPayment({
         </div>
 
         {/* Stripe Checkout Card */}
-        <div className="p-4 rounded-2xl bg-linear-to-br from-slate-50 to-pink-50/30 border border-slate-200 space-y-3">
+        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-black text-xs">
@@ -159,18 +187,21 @@ export function StepPayment({
             </span>
           </div>
 
-          <p className="text-xs text-slate-600 leading-relaxed">
-            {pricingMode === "per_lb"
-              ? "You will securely save your card with Stripe ($0.00 charged today). Your card will only be charged after your clothes are measured on a scale upon pickup."
-              : "You will be redirected to Stripe’s secure hosted checkout page to complete your payment with your preferred method. Your card details are never stored on our servers."}
-          </p>
+          <div className="p-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 space-y-1">
+            <p className="font-bold text-slate-900">
+              {amountDueToday > 0
+                ? `You will see a charge of ${formatCurrency(amountDueToday)} on Stripe today for ${delivery_fee > 0 ? "doorstep delivery" : ""}${delivery_fee > 0 && effectiveTip > 0 ? " & " : ""}${effectiveTip > 0 ? "driver tip" : ""}.`
+                : "You will see a $0.00 charge on Stripe today to verify and save your card on file."}
+            </p>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Your remaining laundry service charge of <strong className="text-slate-800">{formatCurrency(amountChargedLater)}</strong> will be charged to this saved card only after our courier picks up and weighs/processes your laundry.
+            </p>
+          </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-semibold text-slate-500">
-            <span className="px-2 py-0.5 rounded bg-white border border-slate-200 shadow-2xs">Visa</span>
-            <span className="px-2 py-0.5 rounded bg-white border border-slate-200 shadow-2xs">Mastercard</span>
-            <span className="px-2 py-0.5 rounded bg-white border border-slate-200 shadow-2xs">Amex</span>
-            <span className="px-2 py-0.5 rounded bg-white border border-slate-200 shadow-2xs">Apple Pay</span>
-            <span className="px-2 py-0.5 rounded bg-white border border-slate-200 shadow-2xs">Google Pay</span>
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] font-semibold text-slate-500">
+            {["Visa", "Mastercard", "Amex", "Apple Pay", "Google Pay"].map((m) => (
+              <span key={m} className="px-2 py-0.5 rounded bg-white border border-slate-200 shadow-2xs">{m}</span>
+            ))}
           </div>
         </div>
       </div>
@@ -190,13 +221,13 @@ export function StepPayment({
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Redirecting to Stripe...
             </>
-          ) : pricingMode === "per_lb" ? (
+          ) : amountDueToday > 0 ? (
             <>
-              Authorize Card &amp; Confirm Booking ($0.00 Today) <ArrowRight className="h-4 w-4 ml-2" />
+              Pay {formatCurrency(amountDueToday)} Today &amp; Save Card <ArrowRight className="h-4 w-4 ml-2" />
             </>
           ) : (
             <>
-              Proceed to Stripe Checkout ({formatCurrency(total_amount)}) <ArrowRight className="h-4 w-4 ml-2" />
+              Authorize Card &amp; Confirm Booking ($0.00 Today) <ArrowRight className="h-4 w-4 ml-2" />
             </>
           )}
         </Button>

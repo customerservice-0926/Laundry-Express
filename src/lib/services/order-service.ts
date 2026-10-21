@@ -226,7 +226,7 @@ export class OrderService {
     const perPoundRate = order.pricing_mode === "per_lb" && order.estimated_weight_lbs ? order.subtotal / order.estimated_weight_lbs : pricing.pound_price;
     const subtotal = Math.round(weightLbs * perPoundRate * 100) / 100;
     const deliveryFee = weightLbs >= pricing.free_delivery_lbs ? 0 : pricing.standard_delivery_fee;
-    const total = Math.max(0, subtotal + Number((order as Order & { detergent_fee?: number }).detergent_fee || 0) + Number(order.additional_items_fee || 0) + Number(order.tip_amount || 0) + deliveryFee - order.discount_amount);
+    const total = Math.max(0, subtotal + Number((order as Order & { detergent_fee?: number }).detergent_fee || 0) + Number(order.additional_items_fee || 0) + deliveryFee - order.discount_amount);
     const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase.from("orders").update({ final_weight_lbs: weightLbs, subtotal, delivery_fee: deliveryFee, total_amount: total, updated_at: new Date().toISOString() }).eq("id", order.id).select("id").maybeSingle();
     if (error || !data) throw new Error(`Unable to update final weight: ${error?.message || "Order not found."}`);

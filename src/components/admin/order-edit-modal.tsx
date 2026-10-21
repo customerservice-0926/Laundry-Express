@@ -55,12 +55,13 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
     : Number(order.additional_items_fee || 0);
 
   const detergentFee = Number(order.detergent_fee || 0), deliveryFee = Number(order.delivery_fee || 0), discountAmount = Number(order.discount_amount || 0);
-  const calculatedTotal = isLocked
-    ? Number(order.total_amount || 0)
-    : Math.max(0, Math.round((currentSubtotal + detergentFee + additionalItemsFee + deliveryFee + tipAmount - discountAmount) * 100) / 100);
-
+  const calculatedTotal = isLocked ? Number(order.total_amount || 0) : Math.max(0, Math.round((currentSubtotal + detergentFee + additionalItemsFee + deliveryFee + tipAmount - discountAmount) * 100) / 100);
+  const unpaidDelivery = order.delivery_fee_paid ? 0 : deliveryFee;
+  const unpaidTip = order.tip_paid ? 0 : tipAmount;
+  const washBalance = Math.max(0, currentSubtotal + detergentFee + additionalItemsFee - discountAmount);
+  const remainingBalance = Math.round((washBalance + unpaidDelivery + unpaidTip) * 100) / 100;
   const hasCardOnFile = Boolean(order.stripe_payment_method_id || (order.stripe_customer_id && (order.card_last4 || order.stripe_payment_method_id)));
-  const amountToCharge = !isAlreadyPaid ? calculatedTotal : 0;
+  const amountToCharge = !isAlreadyPaid ? remainingBalance : 0;
 
   const handleUpdateAddItem = (item: AdditionalItem, delta: number) => {
     if (isLocked) return;
@@ -220,7 +221,7 @@ export function OrderEditModal({ order, isOpen, onClose, onOrderUpdated }: Order
               <CreditCard className="h-4 w-4 text-emerald-600 shrink-0" />
               <div>
                 <span className="font-extrabold block">Card on File: {(order.card_brand || "Card").toUpperCase()} •••• {order.card_last4 || "Stored"}</span>
-                <span className="text-[11px] text-emerald-700">Order balance of {formatCurrency(amountToCharge)} will be charged via Stripe</span>
+                <span className="text-[11px] text-emerald-700">Order balance of {formatCurrency(amountToCharge)} will be charged via Stripe{(order.delivery_fee_paid || order.tip_paid) ? " (Delivery & Tip settled upfront)" : ""}</span>
               </div>
             </div>
             <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 font-black text-xs">+{formatCurrency(amountToCharge)}</span>

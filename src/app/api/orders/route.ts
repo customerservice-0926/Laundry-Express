@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { OrderService } from "@/lib/services/order-service";
 import { sendOrderCancellationEmail } from "@/lib/services/cancellation-email";
 import { sendReviewRequestEmail } from "@/lib/services/email-service";
+import { generateReviewToken } from "@/lib/services/review-token-service";
 import { getVerifiedUser } from "@/lib/auth-request";
 import type { OrderStatus } from "@/types";
 
@@ -201,13 +202,14 @@ export async function PATCH(req: NextRequest) {
               : completedOrder.pricing_mode === "per_lb"
               ? `By the Pound (${completedOrder.final_weight_lbs || completedOrder.estimated_weight_lbs || 15} lbs)`
               : "Wash & Fold Package";
+            const reviewToken = generateReviewToken(completedOrder.order_number, completedOrder.id, completedOrder.customer_email);
             await sendReviewRequestEmail({
               orderNumber: completedOrder.order_number,
               customerName: completedOrder.customer_name || "Valued Customer",
               customerEmail: completedOrder.customer_email,
               deliveryDate: completedOrder.delivery_date || undefined,
               planName,
-              reviewUrl: `${origin}/dashboard/ratings?order_id=${encodeURIComponent(completedOrder.order_number)}`,
+              reviewUrl: `${origin}/review/${encodeURIComponent(completedOrder.order_number)}?token=${encodeURIComponent(reviewToken)}`,
             });
           }
         } catch (err) {

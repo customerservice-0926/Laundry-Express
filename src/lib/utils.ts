@@ -152,3 +152,31 @@ export function resolveDetergentName(id?: string | null): string {
     id.replace(/^det-/, "").replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   );
 }
+
+/**
+ * Calculates core order price excluding tips (laundry service, detergent, specialty items, delivery - discounts).
+ * Tips are an additional driver gratuity and kept separate from order price.
+ */
+export function getOrderPriceWithoutTip(order: {
+  total_amount?: number;
+  tip_amount?: number;
+  subtotal?: number;
+  detergent_fee?: number;
+  additional_items_fee?: number;
+  delivery_fee?: number;
+  discount_amount?: number;
+}): number {
+  const total = Number(order.total_amount || 0);
+  const tip = Number(order.tip_amount || 0);
+  if (tip <= 0) return Math.max(0, total);
+  const sub = Number(order.subtotal || 0);
+  const det = Number(order.detergent_fee || 0);
+  const addl = Number(order.additional_items_fee || 0);
+  const del = Number(order.delivery_fee || 0);
+  const disc = Number(order.discount_amount || 0);
+  const sumWithTip = sub + det + addl + del + tip - disc;
+  if (Math.abs(total - sumWithTip) < 0.05) {
+    return Math.max(0, total - tip);
+  }
+  return Math.max(0, total);
+}

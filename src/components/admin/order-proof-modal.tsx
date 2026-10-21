@@ -121,6 +121,21 @@ export function OrderProofModal({
           </div>
         )}
 
+        {order.additional_items && order.additional_items.length > 0 && proofType !== "damage" && (
+          <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-purple-900">
+            <span className="font-bold block text-[11px] mb-1">
+              {proofType === "pickup" ? "📦 Additional Items to Collect:" : "📦 Additional Items to Deliver:"}
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {order.additional_items.map((i, idx) => (
+                <span key={i.id || idx} className="px-2 py-0.5 rounded-md bg-white border border-purple-200 font-semibold text-purple-800 text-[10px]">
+                  {i.name} ×{i.quantity}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {proofType === "damage" && (
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Flaw Description (Optional)</label>

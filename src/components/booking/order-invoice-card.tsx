@@ -207,12 +207,20 @@ export function OrderInvoiceCard({ invoice, className = "" }: OrderInvoiceCardPr
                 </span>
               }
             />
-            <div className="flex items-center justify-between py-3.5 bg-pink-50/50 px-3 -mx-3 rounded-b-xl border-t border-slate-100">
+            <InvoiceRow
+              label="Paid Today via Stripe"
+              value={<span className="text-emerald-700 font-black">{formatCurrency(deliveryFee + tipAmount)}</span>}
+            />
+            <InvoiceRow
+              label="Next Charge (After Pickup)"
+              value={<span className="text-primary font-black">{formatCurrency(Math.max(0, subtotal + detergentFee + additionalItemsFee - discountAmount))}</span>}
+            />
+            <div className="flex items-center justify-between py-3 bg-pink-50/60 px-3 -mx-3 rounded-b-xl border-t border-slate-100">
               <div>
-                <span className="text-xs font-black text-slate-900 block">Total Cleared &amp; Authorized</span>
-                <span className="text-[10px] text-slate-400">Captured securely via Stripe TLS 1.3 gateway</span>
+                <span className="text-xs font-black text-slate-900 block">Order Price (Excl. Tip)</span>
+                <span className="text-[10px] text-slate-500">Service, items &amp; delivery</span>
               </div>
-              <span className="text-2xl font-black text-primary tracking-tight">{formatCurrency(totalAmount)}</span>
+              <span className="text-2xl font-black text-slate-900 tracking-tight">{formatCurrency(totalAmount)}</span>
             </div>
           </div>
         </div>

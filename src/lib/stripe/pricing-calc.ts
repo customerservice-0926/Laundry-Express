@@ -134,9 +134,9 @@ export function calculateOrderPrice(input: CalculatePriceInput): CalculatedPrice
     promoApplied = input.promo.code;
   }
 
-  const taxableAmount = Math.max(0, subtotal + detergentFee + additionalItemsFee + deliveryFee + tipAmount - discountAmount);
+  const orderPrice = Math.max(0, subtotal + detergentFee + additionalItemsFee + deliveryFee - discountAmount);
   const taxAmount = 0; // Tax-exempt or bundled in base rate
-  const totalAmount = Math.round(taxableAmount * 100) / 100;
+  const totalAmount = Math.round(orderPrice * 100) / 100;
 
   return {
     pricing_mode: input.pricing_mode,

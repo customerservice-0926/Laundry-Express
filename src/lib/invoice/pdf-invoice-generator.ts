@@ -179,9 +179,9 @@ export function createInvoicePdfDoc(invoice: UnifiedInvoiceInput, logoDataUri?: 
   pdf.setFillColor(253, 242, 248); pdf.setDrawColor(251, 207, 232);
   pdf.rect(margin, y, contentW, 11, "FD");
   pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.5); pdf.setTextColor(15, 23, 42);
-  pdf.text("TOTAL CLEARED & AUTHORIZED", margin + 4, y + 5);
+  pdf.text("TOTAL ORDER PRICE (EXCL. TIP)", margin + 4, y + 5);
   pdf.setFontSize(6.5); pdf.setFont("helvetica", "normal"); pdf.setTextColor(100, 116, 139);
-  pdf.text("Captured securely via Stripe TLS 1.3 gateway", margin + 4, y + 8.5);
+  pdf.text("Service, items & delivery fees", margin + 4, y + 8.5);
   pdf.setFontSize(13); pdf.setFont("helvetica", "bold"); pdf.setTextColor(190, 24, 93);
   pdf.text(formatCurrency(totalAmount), W - margin - 4, y + 7.5, { align: "right" });
   y += 15;

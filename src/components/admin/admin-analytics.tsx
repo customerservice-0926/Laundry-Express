@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { DollarSign, CheckCircle2, TrendingUp, Calendar, ChevronDown, Heart } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, getOrderPriceWithoutTip } from "@/lib/utils";
 import { PieChart, type PieSlice } from "@/components/shared/pie-chart";
 import type { Order } from "@/types";
 
@@ -68,7 +68,7 @@ export function AdminAnalytics({ orders }: AdminAnalyticsProps) {
     const isDone = (s: string) => s === "completed" || s === "delivered";
     const completedOrders = filteredOrders.filter((o) => isDone(o.order_status));
     const activeOrders = filteredOrders.filter((o) => !isDone(o.order_status) && o.order_status !== "cancelled");
-    const totalCompletedRevenue = completedOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const totalCompletedRevenue = completedOrders.reduce((sum, o) => sum + getOrderPriceWithoutTip(o), 0);
     const aov = completedOrders.length > 0 ? totalCompletedRevenue / completedOrders.length : 0;
     const totalTips = filteredOrders.reduce((sum, o) => sum + Number(o.tip_amount || 0), 0);
     const tippedOrdersCount = filteredOrders.filter((o) => Number(o.tip_amount || 0) > 0).length;
@@ -93,11 +93,11 @@ export function AdminAnalytics({ orders }: AdminAnalyticsProps) {
       totalTips,
       tippedOrdersCount,
       bagCount: bagOrders.length,
-      bagRevenue: bagOrders.reduce((s, o) => s + Number(o.total_amount || 0), 0),
+      bagRevenue: bagOrders.reduce((s, o) => s + getOrderPriceWithoutTip(o), 0),
       poundCount: poundOrders.length,
-      poundRevenue: poundOrders.reduce((s, o) => s + Number(o.total_amount || 0), 0),
+      poundRevenue: poundOrders.reduce((s, o) => s + getOrderPriceWithoutTip(o), 0),
       pkgCount: pkgOrders.length,
-      pkgRevenue: pkgOrders.reduce((s, o) => s + Number(o.total_amount || 0), 0),
+      pkgRevenue: pkgOrders.reduce((s, o) => s + getOrderPriceWithoutTip(o), 0),
     };
   }, [filteredOrders]);
 
@@ -148,7 +148,7 @@ export function AdminAnalytics({ orders }: AdminAnalyticsProps) {
             <DollarSign className="h-4 w-4" />
           </div>
           <p className="text-2xl font-black text-emerald-950">{formatCurrency(metrics.totalCompletedRevenue)}</p>
-          <span className="text-[11px] text-emerald-700 font-medium block">{metrics.completedCount} completed orders</span>
+          <span className="text-[11px] text-emerald-700 font-medium block">{metrics.completedCount} orders · excl. tips</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200/70 space-y-1">

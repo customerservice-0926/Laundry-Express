@@ -3,7 +3,7 @@
 import { Clock, Camera, AlertTriangle, Check, Send, ChevronRight, Scale } from "lucide-react";
 import type { Order, OrderStatus } from "@/types";
 import { ORDER_STATUSES } from "@/lib/constants";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getOrderPriceWithoutTip } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 interface OrderCardProps {
@@ -66,7 +66,12 @@ export function OrderCard({
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs">
           <span className="font-bold text-slate-900">{order.customer_name || order.user?.full_name || "Customer"}</span>
-          <span className="font-black text-slate-900 text-sm">{formatCurrency(order.total_amount)}</span>
+          <div className="text-right">
+            <span className="font-black text-slate-900 text-sm">{formatCurrency(getOrderPriceWithoutTip(order))}</span>
+            {Number(order.tip_amount || 0) > 0 && (
+              <span className="text-[10px] text-emerald-600 font-semibold block">+{formatCurrency(Number(order.tip_amount || 0))} tip</span>
+            )}
+          </div>
         </div>
         <p className="text-[11px] text-slate-500 line-clamp-1">
           {[order.street_address, order.apt_unit ? `Apt ${order.apt_unit}` : "", order.city, order.state, order.zip_code].filter(Boolean).join(", ") || order.pickup_address || "Doorstep Address"}
@@ -83,6 +88,12 @@ export function OrderCard({
             <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1">
               <AlertTriangle className="h-3 w-3 shrink-0 text-rose-600" />
               Damage Logged
+            </span>
+          )}
+
+          {order.additional_items && order.additional_items.length > 0 && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
+              +{order.additional_items.reduce((acc, i) => acc + (i.quantity || 1), 0)} Addl Items
             </span>
           )}
         </div>
@@ -116,97 +127,66 @@ export function OrderCard({
         onClick={(e) => e.stopPropagation()}
       >
         {order.order_status === "pending" && (
-          <Button
-            variant="hero"
-            size="sm"
-            className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 font-bold"
-            onClick={() => onUpdateStatus(order.id, "confirmed")}
-          >
-            <Check className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Approve Order
+          <Button variant="hero" size="sm" className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 font-bold" onClick={() => onUpdateStatus(order.id, "confirmed")}>
+            <Check className="h-3.5 w-3.5 mr-1 shrink-0" /> Approve Order
           </Button>
         )}
 
         {order.order_status === "confirmed" && (
-          <Button
-            variant="hero"
-            size="sm"
-            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 font-bold"
-            onClick={() => onUpdateStatus(order.id, "driver_assigned")}
-          >
-            <Send className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Assign Driver
+          <Button variant="hero" size="sm" className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={() => onUpdateStatus(order.id, "driver_assigned")}>
+            <Send className="h-3.5 w-3.5 mr-1 shrink-0" /> Assign Driver
           </Button>
         )}
 
         {order.order_status === "driver_assigned" && (
-          canWeighAndCharge && onWeighOrder ? (
-            <Button
-              variant="hero"
-              size="sm"
-              className="h-8 px-2.5 text-xs bg-amber-600 hover:bg-amber-700 font-bold"
-              onClick={() => onWeighOrder(order)}
-              title="Weigh clothes on scale and charge customer card upon pickup"
-            >
-              <Scale className="h-3.5 w-3.5 mr-1 shrink-0" />
-              Pickup &amp; Weigh
+          <>
+            {canWeighAndCharge && onWeighOrder ? (
+              <Button variant="hero" size="sm" className="h-8 px-2.5 text-xs bg-amber-600 hover:bg-amber-700 font-bold" onClick={() => onWeighOrder(order)} title="Weigh on scale and charge card upon pickup">
+                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Pickup &amp; Weigh
+              </Button>
+            ) : (
+              <Button variant="primary" size="sm" className="h-8 px-2.5 text-xs" onClick={() => onOpenProofModal(order, "pickup")}>
+                <Camera className="h-3.5 w-3.5 mr-1 shrink-0" /> Pickup Proof
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="h-8 px-2 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50" onClick={() => onUpdateStatus(order.id, "picked_up")} title="Mark order picked up">
+              Picked Up
             </Button>
-          ) : (
-            <Button
-              variant="primary"
-              size="sm"
-              className="h-8 px-3 text-xs"
-              onClick={() => onOpenProofModal(order, "pickup")}
-            >
-              <Camera className="h-3.5 w-3.5 mr-1 shrink-0" />
-              Pickup Proof
+          </>
+        )}
+
+        {order.order_status === "picked_up" && (
+          <>
+            {canWeighAndCharge && onWeighOrder && (
+              <Button variant="hero" size="sm" className="h-8 px-2.5 text-xs bg-amber-600 hover:bg-amber-700 font-bold" onClick={() => onWeighOrder(order)} title="Weigh clothes on scale and charge card">
+                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Weigh &amp; Charge
+              </Button>
+            )}
+            <Button variant={canWeighAndCharge ? "outline" : "hero"} size="sm" className={canWeighAndCharge ? "h-8 px-2 text-xs border-purple-300 text-purple-700 hover:bg-purple-50" : "h-8 px-3 text-xs bg-purple-600 hover:bg-purple-700 font-bold text-white"} onClick={() => onUpdateStatus(order.id, "in_wash")} title="Start washing order">
+              <Check className="h-3.5 w-3.5 mr-1 shrink-0" /> Start Wash
             </Button>
-          )
+          </>
         )}
 
         {order.order_status === "in_wash" && (
           <>
             {canWeighAndCharge && onWeighOrder && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
-                onClick={() => onWeighOrder(order)}
-                title="Adjust scale weight or charge card"
-              >
-                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" />
-                Adjust Weight
+              <Button variant="outline" size="sm" className="h-8 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => onWeighOrder(order)} title="Adjust scale weight or charge card">
+                <Scale className="h-3.5 w-3.5 mr-1 shrink-0" /> Adjust Weight
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 text-xs border-rose-300 text-rose-700 hover:bg-rose-50"
-              onClick={() => onOpenProofModal(order, "damage")}
-            >
-              <AlertTriangle className="h-3.5 w-3.5 mr-1 text-rose-600 shrink-0" />
-              Damage
+            <Button variant="outline" size="sm" className="h-8 px-2 text-xs border-rose-300 text-rose-700 hover:bg-rose-50" onClick={() => onOpenProofModal(order, "damage")}>
+              <AlertTriangle className="h-3.5 w-3.5 mr-1 text-rose-600 shrink-0" /> Damage
             </Button>
-            <Button
-              variant="hero"
-              size="sm"
-              className="h-8 px-2.5 text-xs"
-              onClick={() => onUpdateStatus(order.id, "out_for_delivery")}
-            >
+            <Button variant="hero" size="sm" className="h-8 px-2.5 text-xs" onClick={() => onUpdateStatus(order.id, "out_for_delivery")}>
               Ready Delivery
             </Button>
           </>
         )}
 
         {order.order_status === "out_for_delivery" && (
-          <Button
-            variant="hero"
-            size="sm"
-            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => onOpenProofModal(order, "dropoff")}
-          >
-            <Camera className="h-3.5 w-3.5 mr-1 shrink-0" />
-            Deliver (Photo)
+          <Button variant="hero" size="sm" className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => onOpenProofModal(order, "dropoff")}>
+            <Camera className="h-3.5 w-3.5 mr-1 shrink-0" /> Deliver (Photo)
           </Button>
         )}
 

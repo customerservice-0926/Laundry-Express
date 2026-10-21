@@ -119,9 +119,28 @@ export class CardOnFileService {
       };
     }
 
-    const amountToCharge = typeof customAmount === "number" && customAmount > 0
-      ? customAmount
-      : order.total_amount;
+    const unpaidDelivery = order.delivery_fee_paid ? 0 : Number(order.delivery_fee || 0);
+    const unpaidTip = order.tip_paid ? 0 : Number(order.tip_amount || 0);
+    const washAndItems = Math.max(
+      0,
+      Number(order.subtotal || 0) +
+      Number(order.detergent_fee || 0) +
+      Number(order.additional_items_fee || 0) -
+      Number(order.discount_amount || 0)
+    );
+    const remainingBalance = Math.round((washAndItems + unpaidDelivery + unpaidTip) * 100) / 100;
+
+    let amountToCharge: number;
+    if (typeof customAmount === "number" && customAmount > 0) {
+      const alreadyPaid = (order.delivery_fee_paid ? Number(order.delivery_fee || 0) : 0) + (order.tip_paid ? Number(order.tip_amount || 0) : 0);
+      if (alreadyPaid > 0 && Math.abs(customAmount - Number(order.total_amount || 0)) < 0.01) {
+        amountToCharge = remainingBalance;
+      } else {
+        amountToCharge = customAmount;
+      }
+    } else {
+      amountToCharge = remainingBalance > 0 ? remainingBalance : Number(order.total_amount || 0);
+    }
 
     if (amountToCharge <= 0) {
       return { success: false, error: "Charge amount must be greater than $0.00." };
@@ -138,10 +157,13 @@ export class CardOnFileService {
         payment_method: paymentMethodId,
         off_session: true,
         confirm: true,
-        description: `Laundry Express Order #${order.order_number} (Card on File Charge)`,
+        description: `Laundry Express Order #${order.order_number} (Wash & Specialty Balance: $${amountToCharge.toFixed(2)})`,
         metadata: {
           order_id: order.id,
           order_number: order.order_number,
+          wash_balance: amountToCharge.toFixed(2),
+          delivery_paid: String(order.delivery_fee_paid ?? false),
+          tip_paid: String(order.tip_paid ?? false),
         },
       });
       paymentIntentId = intent.id;
@@ -152,8 +174,6 @@ export class CardOnFileService {
 
     const finalTotal = typeof newTotalAmount === "number" && newTotalAmount > 0
       ? newTotalAmount
-      : typeof customAmount === "number" && customAmount > 0
-      ? Math.max(order.total_amount, customAmount)
       : order.total_amount;
 
     // Update order status to paid
